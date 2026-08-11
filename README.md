@@ -50,7 +50,7 @@ PawPal 是一个桌面宠物应用，支持 macOS 和 Windows。一只透明、�
 
 ### 从源码运行
 
-需要 Node.js 20+ 和 pnpm 9。推荐通过 Corepack 启用 pnpm：
+需要 Node.js 24+ 和 pnpm 11。推荐通过 Corepack 启用 pnpm（版本以 `package.json` 的 `packageManager` 为准）：
 
 ```bash
 corepack enable
@@ -60,7 +60,7 @@ pnpm install
 pnpm dev
 ```
 
-如果 `corepack enable` 没有权限，请用其他方式安装 pnpm 9，并确认 `pnpm --version` 可以正常运行。
+如果 `corepack enable` 没有权限，请用其他方式安装 pnpm 11，并确认 `pnpm --version` 可以正常运行。
 
 ## 构建
 
@@ -132,9 +132,9 @@ pnpm install
 pnpm dev
 ```
 
-Source builds require Node.js 20+ and pnpm 9. Make sure the `pnpm` command is available in your shell before packaging, because electron-builder uses it while collecting dependencies.
+Source builds require Node.js 24+ and pnpm 11 (see `packageManager` in `package.json`). Make sure the `pnpm` command is available in your shell before packaging, because electron-builder uses it while collecting dependencies.
 
-If `corepack enable` does not have permission to install shims, install pnpm 9 another way and verify that `pnpm --version` works.
+If `corepack enable` does not have permission to install shims, install pnpm 11 another way and verify that `pnpm --version` works.
 
 Common commands:
 
