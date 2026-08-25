@@ -101,6 +101,7 @@ textarea {
 }
 
 .state-focusAlert {
+  /* reserved for future focus-alert animation */
 }
 
 .speech-bubble {
@@ -207,7 +208,6 @@ textarea {
   color: var(--ink);
   font-size: 13.5px;
   height: 100vh;
-  overflow-y: overlay;
   overflow-y: auto;
   padding: 52px max(32px, calc(50% - 280px)) 56px;
   position: relative;
@@ -1140,9 +1140,9 @@ textarea {
 }
 
 .settings-shell .diagnostic-copy {
-  background: rgba(60, 47, 28, 0.06);
+  background: #f5f3f1;
   border-radius: 6px;
-  color: #6e6457;
+  color: #3d3229;
   font-size: 13px;
   line-height: 1.5;
   margin: 12px 0 0;

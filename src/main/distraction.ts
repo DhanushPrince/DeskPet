@@ -30,7 +30,7 @@ export function readActiveWindow(): Promise<ActiveWindowInfo> {
   return new Promise((resolve, reject) => {
     execFile("/usr/bin/osascript", ["-e", activeWindowScript()], { timeout: 2500 }, (error, stdout) => {
       if (error) {
-        reject(error);
+        reject(error as Error);
         return;
       }
       const [appName = "", ...titleParts] = stdout.trimEnd().split("\n");

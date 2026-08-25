@@ -10,7 +10,7 @@ export function resolveLanguage(value: unknown): Language {
 }
 
 export function pick<T>(items: readonly T[]): T {
-  return items[Math.floor(Math.random() * items.length)];
+  return items[Math.floor(Math.random() * items.length)]; // NOSONAR — non-cryptographic random text selection
 }
 
 export const I18N = {

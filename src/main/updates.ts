@@ -54,12 +54,12 @@ export async function checkGitHubReleasesForUpdates(
       throw new Error("Unexpected release response");
     }
 
-    const latestVersion =
-      typeof payload.tag_name === "string"
-        ? payload.tag_name
-        : typeof payload.name === "string"
-          ? payload.name
-          : "";
+    let latestVersion = "";
+    if (typeof payload.tag_name === "string") {
+      latestVersion = payload.tag_name;
+    } else if (typeof payload.name === "string") {
+      latestVersion = payload.name;
+    }
 
     if (!latestVersion) {
       throw new Error("Latest release has no version tag");

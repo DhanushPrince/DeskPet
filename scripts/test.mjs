@@ -12,7 +12,7 @@ async function findTests(dir) {
     entries.map((entry) => {
       const path = resolve(dir, entry.name);
       if (entry.isDirectory()) return findTests(path);
-      return entry.name.endsWith(".test.ts") ? [path] : [];
+      return Promise.resolve(entry.name.endsWith(".test.ts") ? [path] : []);
     })
   );
   return files.flat();

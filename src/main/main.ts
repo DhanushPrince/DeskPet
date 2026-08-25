@@ -625,8 +625,8 @@ function showBreakRunCountdown(endsAt: number): void {
 }
 
 function chooseBreakRunVelocity(): PetPosition {
-  const speed = 3.5 + Math.random() * 2.9;
-  const angle = Math.random() * Math.PI * 2;
+  const speed = 3.5 + Math.random() * 2.9; // NOSONAR — non-cryptographic pet animation
+  const angle = Math.random() * Math.PI * 2; // NOSONAR — non-cryptographic pet animation
   return {
     x: Math.cos(angle) * speed,
     y: Math.sin(angle) * speed
@@ -647,7 +647,7 @@ function movePetForBreakRun(): void {
   const minY = workArea.y + 8;
   const maxY = workArea.y + workArea.height - PET_WINDOW.height - 8;
 
-  if (now >= nextBreakRunTurnAt && Math.random() < 0.45) {
+  if (now >= nextBreakRunTurnAt && Math.random() < 0.45) { // NOSONAR — non-cryptographic pet animation
     breakRunVelocity = chooseBreakRunVelocity();
   }
 
@@ -672,7 +672,7 @@ function movePetForBreakRun(): void {
   }
 
   if (now >= nextBreakRunTurnAt) {
-    nextBreakRunTurnAt = now + 350 + Math.round(Math.random() * 850);
+    nextBreakRunTurnAt = now + 350 + Math.round(Math.random() * 850); // NOSONAR — non-cryptographic pet animation
   }
 
   setPetFacing(breakRunVelocity.x >= 0 ? "right" : "left");
@@ -1181,51 +1181,52 @@ protocol.registerSchemesAsPrivileged([
   { scheme: "pawpal-asset", privileges: { bypassCSP: true, supportFetchAPI: true } }
 ]);
 
-app.whenReady().then(() => {
-  protocol.handle("pawpal-asset", (request) => {
-    let relativePath = "";
-    try {
-      const url = new URL(request.url);
-      relativePath = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
-    } catch {
-      return new Response("Invalid asset URL", { status: 404 });
-    }
+app.whenReady().then(() => { // NOSONAR — Electron main process does not reliably support top-level await
 
-    const appBase = app.isPackaged ? process.resourcesPath : process.cwd();
-    const builtInAssetRoot = resolve(appBase, "pet_assets");
-    const customAssetRoot = resolve(app.getPath("userData"), "custom_pet_assets");
-    const assetPath = relativePath.startsWith("custom_pet_assets/")
-      ? resolve(app.getPath("userData"), relativePath)
-      : resolve(appBase, relativePath);
-    const isInsideBuiltInAssetRoot =
-      assetPath === builtInAssetRoot || assetPath.startsWith(`${builtInAssetRoot}${sep}`);
-    const isInsideCustomAssetRoot =
-      assetPath === customAssetRoot || assetPath.startsWith(`${customAssetRoot}${sep}`);
-
-    if (!isInsideBuiltInAssetRoot && !isInsideCustomAssetRoot) {
-      return new Response("Asset not found", { status: 404 });
-    }
-
-    return net.fetch(pathToFileURL(assetPath).href);
-  });
-
-  getStats();
-  registerIpc();
-  createPetWindow();
-  createTray();
-  registerDisplayChangeHandlers();
-  scheduleReminderTimers();
-  scheduleDistractionDetection();
-  if (IS_DEV) {
-    createSettingsWindow();
-  }
-  if (getSettings().checkUpdatesOnLaunchEnabled) {
-    setTimeout(() => void checkForUpdates({ notifyAvailable: true }), 1500);
+protocol.handle("pawpal-asset", (request) => {
+  let relativePath = "";
+  try {
+    const url = new URL(request.url);
+    relativePath = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
+  } catch {
+    return new Response("Invalid asset URL", { status: 404 });
   }
 
-  app.on("activate", () => {
-    if (!petWindow) createPetWindow();
-  });
+  const appBase = app.isPackaged ? process.resourcesPath : process.cwd();
+  const builtInAssetRoot = resolve(appBase, "pet_assets");
+  const customAssetRoot = resolve(app.getPath("userData"), "custom_pet_assets");
+  const assetPath = relativePath.startsWith("custom_pet_assets/")
+    ? resolve(app.getPath("userData"), relativePath)
+    : resolve(appBase, relativePath);
+  const isInsideBuiltInAssetRoot =
+    assetPath === builtInAssetRoot || assetPath.startsWith(`${builtInAssetRoot}${sep}`);
+  const isInsideCustomAssetRoot =
+    assetPath === customAssetRoot || assetPath.startsWith(`${customAssetRoot}${sep}`);
+
+  if (!isInsideBuiltInAssetRoot && !isInsideCustomAssetRoot) {
+    return new Response("Asset not found", { status: 404 });
+  }
+
+  return net.fetch(pathToFileURL(assetPath).href);
+});
+
+getStats();
+registerIpc();
+createPetWindow();
+createTray();
+registerDisplayChangeHandlers();
+scheduleReminderTimers();
+scheduleDistractionDetection();
+if (IS_DEV) {
+  createSettingsWindow();
+}
+if (getSettings().checkUpdatesOnLaunchEnabled) {
+  setTimeout(() => void checkForUpdates({ notifyAvailable: true }), 1500);
+}
+
+app.on("activate", () => {
+  if (!petWindow) createPetWindow();
+});
 });
 
 app.on("before-quit", () => {

@@ -14,12 +14,11 @@ export function getStatsHistory(store: StatsStore): StatsHistory {
 
 export function isSameStats(left: TodayStats | undefined, right: TodayStats): boolean {
   return Boolean(
-    left &&
-      left.date === right.date &&
-      left.breaksTaken === right.breaksTaken &&
-      left.watersLogged === right.watersLogged &&
-      left.focusMinutes === right.focusMinutes &&
-      left.focusWarnings === right.focusWarnings
+    left?.date === right.date &&
+      left?.breaksTaken === right.breaksTaken &&
+      left?.watersLogged === right.watersLogged &&
+      left?.focusMinutes === right.focusMinutes &&
+      left?.focusWarnings === right.focusWarnings
   );
 }
 

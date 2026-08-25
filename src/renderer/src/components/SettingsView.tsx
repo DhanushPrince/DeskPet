@@ -14,6 +14,7 @@ import type {
   CustomPetAppearance,
   CustomPetAsset,
   DemoTrigger,
+  Language,
   PetState,
   Settings,
   UpdateCheckResult
@@ -28,11 +29,11 @@ function Row({
   label,
   hint,
   control
-}: {
+}: Readonly<{
   label: string;
   hint?: string;
   control: JSX.Element;
-}): JSX.Element {
+}>): JSX.Element {
   return (
     <div className="pref-row">
       <div className="pref-row__label">
@@ -48,11 +49,11 @@ function ToggleControl({
   checked,
   onChange,
   ariaLabel
-}: {
+}: Readonly<{
   checked: boolean;
   onChange: (next: boolean) => void;
   ariaLabel: string;
-}): JSX.Element {
+}>): JSX.Element {
   return (
     <button
       type="button"
@@ -73,13 +74,13 @@ function NumberControl({
   max,
   unit,
   onChange
-}: {
+}: Readonly<{
   value: number;
   min: number;
   max: number;
   unit: string;
   onChange: (next: number) => void;
-}): JSX.Element {
+}>): JSX.Element {
   const [draft, setDraft] = useState(String(value));
 
   useEffect(() => {
@@ -154,11 +155,11 @@ function SelectControl({
   value,
   options,
   onChange
-}: {
+}: Readonly<{
   value: string;
   options: Array<{ value: string; label: string }>;
   onChange: (value: string) => void;
-}): JSX.Element {
+}>): JSX.Element {
   return (
     <select className="pref-select" value={value} onChange={(event) => onChange(event.target.value)}>
       {options.map((option) => (
@@ -174,11 +175,11 @@ function ChipsControl({
   value,
   onChange,
   labels
-}: {
+}: Readonly<{
   value: string[];
   onChange: (next: string[]) => void;
   labels: SettingsCopy;
-}): JSX.Element {
+}>): JSX.Element {
   const [draft, setDraft] = useState("");
 
   function commit(raw: string): void {
@@ -236,11 +237,11 @@ function StatCard({
   label,
   value,
   unit
-}: {
+}: Readonly<{
   label: string;
   value: number;
   unit?: string;
-}): JSX.Element {
+}>): JSX.Element {
   return (
     <div className="stat-card">
       <span className="stat-card__label">{label}</span>
@@ -731,73 +732,85 @@ export function SettingsView(): JSX.Element {
           <span className="prefs__disclosure-caret">{diagnosticsOpen ? "▾" : "▸"}</span>
         </button>
         {diagnosticsOpen ? (
-          <div className="prefs__diag">
-            <DiagGroup title={labels.runtime}>
-              <DiagCard label={labels.state} value={snapshot.petState} />
-              <DiagCard
-                label={labels.mode}
-                value={
-                  snapshot.focusActive
-                    ? labels.focus
-                    : labels.idle
-                }
-              />
-              <DiagCard label={labels.reminder} value={snapshot.blockingMode ?? labels.none} />
-              <DiagCard
-                label={labels.dog}
-                value={snapshot.dogVisible ? labels.visible : labels.hidden}
-              />
-            </DiagGroup>
-
-            <DiagGroup title={labels.distraction}>
-              <DiagCard
-                label={labels.status}
-                value={formatDistractionState(snapshot.distraction.state, labels)}
-              />
-              <DiagCard
-                label={labels.matched}
-                value={snapshot.distraction.matchedRule ?? labels.none}
-              />
-              <DiagCard
-                label={labels.app}
-                value={snapshot.distraction.activeApp || labels.none}
-              />
-              <DiagCard
-                label={labels.checked}
-                value={formatTimestamp(snapshot.distraction.lastCheckedAt, language, labels)}
-              />
-            </DiagGroup>
-
-            {snapshot.distraction.activeWindowTitle ? (
-              <p className="prefs__diag-note">{snapshot.distraction.activeWindowTitle}</p>
-            ) : null}
-            <p className="prefs__diag-hint">{distractionHelp(snapshot, labels)}</p>
-
-            <DiagGroup title={labels.timers}>
-              <DiagCard
-                label={labels.break}
-                value={formatTimer(snapshot.timers.breakDueAt, now, language, labels)}
-              />
-              <DiagCard
-                label={labels.water}
-                value={formatTimer(snapshot.timers.hydrationDueAt, now, language, labels)}
-              />
-              <DiagCard
-                label={labels.focusEnd}
-                value={formatTimer(snapshot.timers.focusEndsAt, now, language, labels)}
-              />
-              <DiagCard
-                label={labels.updated}
-                value={new Intl.DateTimeFormat(localeFor(language), {
-                  hour: "2-digit",
-                  minute: "2-digit"
-                }).format(now)}
-              />
-            </DiagGroup>
-          </div>
+          <DiagnosticsPanel snapshot={snapshot} language={language} labels={labels} now={now} />
         ) : null}
       </section>
     </main>
+  );
+}
+
+function DiagnosticsPanel({
+  snapshot,
+  language,
+  labels,
+  now
+}: Readonly<{
+  snapshot: ReturnType<typeof useSnapshot>;
+  language: Language;
+  labels: SettingsCopy;
+  now: number;
+}>): JSX.Element {
+  return (
+    <div className="prefs__diag">
+      <DiagGroup title={labels.runtime}>
+        <DiagCard label={labels.state} value={snapshot.petState} />
+        <DiagCard
+          label={labels.mode}
+          value={snapshot.focusActive ? labels.focus : labels.idle}
+        />
+        <DiagCard label={labels.reminder} value={snapshot.blockingMode ?? labels.none} />
+        <DiagCard
+          label={labels.dog}
+          value={snapshot.dogVisible ? labels.visible : labels.hidden}
+        />
+      </DiagGroup>
+
+      <DiagGroup title={labels.distraction}>
+        <DiagCard
+          label={labels.status}
+          value={formatDistractionState(snapshot.distraction.state, labels)}
+        />
+        <DiagCard
+          label={labels.matched}
+          value={snapshot.distraction.matchedRule ?? labels.none}
+        />
+        <DiagCard
+          label={labels.app}
+          value={snapshot.distraction.activeApp || labels.none}
+        />
+        <DiagCard
+          label={labels.checked}
+          value={formatTimestamp(snapshot.distraction.lastCheckedAt, language, labels)}
+        />
+      </DiagGroup>
+
+      {snapshot.distraction.activeWindowTitle ? (
+        <p className="prefs__diag-note">{snapshot.distraction.activeWindowTitle}</p>
+      ) : null}
+      <p className="prefs__diag-hint">{distractionHelp(snapshot, labels)}</p>
+
+      <DiagGroup title={labels.timers}>
+        <DiagCard
+          label={labels.break}
+          value={formatTimer(snapshot.timers.breakDueAt, now, language, labels)}
+        />
+        <DiagCard
+          label={labels.water}
+          value={formatTimer(snapshot.timers.hydrationDueAt, now, language, labels)}
+        />
+        <DiagCard
+          label={labels.focusEnd}
+          value={formatTimer(snapshot.timers.focusEndsAt, now, language, labels)}
+        />
+        <DiagCard
+          label={labels.updated}
+          value={new Intl.DateTimeFormat(localeFor(language), {
+            hour: "2-digit",
+            minute: "2-digit"
+          }).format(now)}
+        />
+      </DiagGroup>
+    </div>
   );
 }
 
@@ -808,14 +821,14 @@ function PetCard({
   selected,
   disabled = false,
   onSelect
-}: {
+}: Readonly<{
   appearanceId?: BuiltInPetAppearanceId;
   label: string;
   previewSrc?: string;
   selected: boolean;
   disabled?: boolean;
   onSelect: () => void;
-}): JSX.Element {
+}>): JSX.Element {
   const asset = useMemo(
     () => (appearanceId ? getPetAsset(appearanceId, "idle") : null),
     [appearanceId]
@@ -837,24 +850,24 @@ function PetCard({
   );
 }
 
+function allowGifDrop(event: DragEvent<HTMLDivElement>): void {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "copy";
+}
+
 function CustomPetEditor({
   customPetAppearance,
   labels,
   onDrop,
   onUpload,
   onRemove
-}: {
+}: Readonly<{
   customPetAppearance: CustomPetAppearance | null;
   labels: SettingsCopy;
   onDrop: (state: PetState, file: File) => void;
   onUpload: (state: PetState) => void;
   onRemove: (state: PetState) => void;
-}): JSX.Element {
-  function allowGifDrop(event: DragEvent<HTMLDivElement>): void {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "copy";
-  }
-
+}>): JSX.Element {
   function handleDrop(event: DragEvent<HTMLDivElement>, state: PetState): void {
     event.preventDefault();
     const file = event.dataTransfer.files[0];
@@ -950,7 +963,7 @@ function CustomPetEditor({
   );
 }
 
-function DemoChip({ trigger, label }: { trigger: DemoTrigger; label: string }): JSX.Element {
+function DemoChip({ trigger, label }: Readonly<{ trigger: DemoTrigger; label: string }>): JSX.Element {
   return (
     <button
       type="button"
@@ -965,10 +978,10 @@ function DemoChip({ trigger, label }: { trigger: DemoTrigger; label: string }): 
 function DiagGroup({
   title,
   children
-}: {
+}: Readonly<{
   title: string;
   children: ReactNode;
-}): JSX.Element {
+}>): JSX.Element {
   return (
     <section className="diag-group">
       <h3 className="diag-group__title">{title}</h3>
@@ -977,7 +990,7 @@ function DiagGroup({
   );
 }
 
-function DiagCard({ label, value }: { label: string; value: string }): JSX.Element {
+function DiagCard({ label, value }: Readonly<{ label: string; value: string }>): JSX.Element {
   return (
     <div className="diag-card">
       <span className="diag-card__label">{label}</span>

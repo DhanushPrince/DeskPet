@@ -46,19 +46,15 @@ function containsPoint(workArea: WorkArea, point: { x: number; y: number }): boo
   );
 }
 
+function axisDistance(value: number, min: number, max: number): number {
+  if (value < min) return min - value;
+  if (value > max) return value - max;
+  return 0;
+}
+
 function distanceToWorkArea(workArea: WorkArea, point: { x: number; y: number }): number {
-  const dx =
-    point.x < workArea.x
-      ? workArea.x - point.x
-      : point.x > workArea.x + workArea.width
-        ? point.x - (workArea.x + workArea.width)
-        : 0;
-  const dy =
-    point.y < workArea.y
-      ? workArea.y - point.y
-      : point.y > workArea.y + workArea.height
-        ? point.y - (workArea.y + workArea.height)
-        : 0;
+  const dx = axisDistance(point.x, workArea.x, workArea.x + workArea.width);
+  const dy = axisDistance(point.y, workArea.y, workArea.y + workArea.height);
   return Math.hypot(dx, dy);
 }
 

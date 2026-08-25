@@ -21,7 +21,7 @@ const BUBBLE_INTERACTIVE_SELECTOR = ".speech-bubble";
 
 function randomVariant(count: number, previous?: number): number {
   if (count <= 1) return 0;
-  let next = Math.floor(Math.random() * count);
+  let next = Math.floor(Math.random() * count); // NOSONAR — non-cryptographic animation variant selection
   if (previous !== undefined && next === previous) {
     next = (next + 1) % count;
   }
@@ -174,7 +174,7 @@ export function PetView(): JSX.Element {
 
   function movePointer(event: PointerEvent<HTMLButtonElement>): void {
     const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (drag?.pointerId !== event.pointerId) return;
     const distance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
     if (!drag.dragging && distance > DRAG_START_DISTANCE_PX) {
       drag.dragging = true;
@@ -184,7 +184,7 @@ export function PetView(): JSX.Element {
 
   function stopPointer(event: PointerEvent<HTMLButtonElement>): void {
     const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (drag?.pointerId !== event.pointerId) return;
     const shouldReleaseCapture = event.currentTarget.hasPointerCapture(event.pointerId);
     finishPointerDrag(true);
     if (shouldReleaseCapture) {
@@ -194,7 +194,7 @@ export function PetView(): JSX.Element {
 
   function cancelPointer(event: PointerEvent<HTMLButtonElement>): void {
     const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (drag?.pointerId !== event.pointerId) return;
     finishPointerDrag(false);
   }
 
