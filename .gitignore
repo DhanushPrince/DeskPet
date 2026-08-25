@@ -7,3 +7,6 @@ dist/
 _raw_assets/
 CLAUDE.md
 docs/release.md
+
+# SonarQube
+.scannerwork/
