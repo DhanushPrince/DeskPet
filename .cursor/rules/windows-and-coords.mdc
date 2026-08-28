@@ -1,0 +1,21 @@
+---
+description: Pet window, accessory lifecycle, and coordinate spaces
+globs: Sources/DeskPetKit/Window/**/*.swift, Sources/DeskPetKit/App/**/*.swift, Sources/DeskPetKit/Settings/**/*.swift
+alwaysApply: false
+---
+
+# Windows and coordinates
+
+**Global space** (Electron): origin top-left of the primary display, y down. All positioning math uses `GlobalRect` / `DisplayGeometry`. Convert **once** at `ScreenBridge` / `CoordinateSpace` for `NSWindow.frame`.
+
+Primary display = screen whose Cocoa `frame.origin == .zero`, **not** `NSScreen.main`.
+
+`jsRound` matches JavaScript `Math.round` (half toward +∞). Do not replace with Swift `rounded()`.
+
+## Pet window
+
+Borderless, clear, `.floating`, `canJoinAllSpaces` + `fullScreenAuxiliary`, `ignoresMouseEvents` until the hitbox, `isReleasedWhenClosed = false`. Override `performClose` to `close()` — AppKit otherwise no-ops and **Quit hangs**.
+
+Settings: AppKit `NSWindow` + `NSHostingView` (no SwiftUI `Window` scene). `applicationShouldTerminateAfterLastWindowClosed` → `false`. Pin `NSAppearance.aqua` on settings (cream palette).
+
+Quit: `prepareToQuit` stops `AppState`, hides pet, closes settings, removes status item, closes remaining windows, then `terminate`.

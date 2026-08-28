@@ -1,0 +1,31 @@
+---
+description: DeskPet product map and non-negotiable architecture
+alwaysApply: true
+---
+
+# DeskPet
+
+Menu-bar desktop pet for macOS 14+. Native rewrite of the Electron app. Swift, AppKit, SwiftUI. **No SPM packages.** No Xcode project: SwiftPM + `Makefile`.
+
+## Layout
+
+- `Sources/DeskPet/main.swift` — calls `DeskPetApp.main()` only
+- `Sources/DeskPetKit/` — all logic (tests link this; SPM cannot test `@main` executables)
+- `Tests/DeskPetTests/` — Swift Testing
+- `Support/` — Info.plist, entitlements, icns
+- `Package.swift` — Swift **5 language mode** on purpose (strict concurrency would fight AppKit)
+
+`make test` / `make app` / `make run`. Ad-hoc signed, `LSUIElement` accessory (no Dock).
+
+## Composition
+
+`AppDelegate` owns lifetime. `AppState` is the composition root (`@Observable`). `PetStateMachine` is **pure** (no timers, windows, or I/O). Features (scheduler, break run, distraction, updates) report; `AppState` applies side effects.
+
+## Do not
+
+- Add dependencies or an Xcode project
+- Put logic only in the executable target
+- Steal keyboard focus (`PetWindow.canBecomeKey == false`; show with `orderFrontRegardless`)
+- Change persisted JSON keys / `PetState` raw values (Electron migration)
+- Use Cocoa coords in geometry math — see window rule
+- Let Quit skip window teardown (`NSApp.terminate` stalls on borderless + status-item windows)

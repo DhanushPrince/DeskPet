@@ -1,0 +1,25 @@
+---
+description: Swift style and where types live in DeskPetKit
+globs: Sources/**/*.swift
+alwaysApply: false
+---
+
+# Swift in DeskPetKit
+
+- Port Electron behavior; keep numbers in `Constants`. User-facing copy in `Strings`.
+- Inject `DeskPetClock` (and similar) for time; tests use `TestClock`.
+- Settings: `Codable` with Electron camelCase keys (`petAppearanceId`). Decode with defaults; `normalized()` on read/write.
+- Persistence: `UserDefaults` for settings/position; `stats.json` under Application Support (ADR-4).
+- Login: `SMAppService.mainApp` only when `Bundle.main.bundlePath.hasSuffix(".app")`.
+- Menus: descriptors in `MenuBuilder`, AppKit in `MenuBuilder.makeMenu`, dispatch `MenuAction` through `AppState.handle`.
+- Debug: `DESKPET_DEBUG_*` env vars in `DebugHarness` (`#if DEBUG` only).
+
+```swift
+// ❌ BAD — logic in DeskPet executable, or new package
+.dependencies: [.package(url: "...")]
+
+// ✅ GOOD — testable type in DeskPetKit, clock injected
+public init(clock: DeskPetClock = SystemClock()) { self.clock = clock }
+```
+
+Keep types `Sendable`/`Equatable` where they already are. Prefer `enum` namespaces (`DisplayGeometry`, `LoginItemService`) over singleton classes.

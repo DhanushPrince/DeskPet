@@ -1,0 +1,25 @@
+---
+description: Swift Testing conventions for DeskPet
+globs: Tests/**/*.swift
+alwaysApply: false
+---
+
+# Tests
+
+Swift Testing (`import Testing`), not XCTest. `@testable import DeskPetKit`.
+
+- Pure logic: no AppKit, inject `TestClock`, name the Electron behavior in the test title.
+- AppKit / `@Observable` / windows: `@MainActor` and often `@Suite(..., .serialized)`.
+- Prefer `#expect` / `#require`. Ported tests should keep the original cases (including JS rounding and “Electron” on the distraction ignore list).
+- Do not require full Xcode or Accessibility permission for the default suite.
+- Window tests: `try #require(!NSScreen.screens.isEmpty)` when they need a display.
+
+```swift
+@Test("a scheduled break is suppressed during focus")
+func scheduledBreakSuppressedByFocus() {
+    let clock = TestClock()
+    let machine = PetStateMachine(clock: clock)
+    machine.startFocus()
+    #expect(machine.triggerBreakReminder() == false)
+}
+```
