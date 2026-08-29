@@ -39,7 +39,7 @@ struct BundleSmokeTests {
     func bundleIdentity() throws {
         let plist = try loadInfoPlist()
         #expect(plist["CFBundleIdentifier"] as? String == "com.dhanushprince.deskpet")
-        #expect(plist["CFBundleShortVersionString"] as? String == "1.0.0")
+        #expect(plist["CFBundleShortVersionString"] as? String == "1.0.1")
         #expect(plist["CFBundleExecutable"] as? String == "DeskPet")
         #expect(plist["CFBundlePackageType"] as? String == "APPL")
     }
@@ -55,6 +55,17 @@ struct BundleSmokeTests {
         // Under `swift test` there is no DeskPet.app, so the literals apply.
         #expect(AppInfo.name == "DeskPet")
         #expect(!AppInfo.version.isEmpty)
+    }
+
+    @Test("assembled app includes the DeskPetKit resource bundle")
+    func kitResourceBundlePackaged() {
+        let app = Self.repoRoot.appendingPathComponent("DeskPet.app")
+        let inResources = app.appendingPathComponent("Contents/Resources/DeskPet_DeskPetKit.bundle")
+        let petAssets = "PetAssets/LineDog/idle"
+        #expect(
+            FileManager.default.fileExists(atPath: inResources.appendingPathComponent(petAssets).path),
+            "DeskPet_DeskPetKit.bundle must be under Contents/Resources"
+        )
     }
 
     @Test("the app icon and entitlements files are present")

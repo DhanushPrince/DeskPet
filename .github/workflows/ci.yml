@@ -10,7 +10,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run tests
-        run: make test
       - name: Assemble app bundle
         run: make app
+      - name: Run tests
+        run: make test

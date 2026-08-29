@@ -7,11 +7,35 @@ import Foundation
 /// The two roots it guarded are preserved: bundled assets under the app's
 /// resource bundle, and imported assets under Application Support.
 public enum PetAssetLoader {
+    private static let kitResourceBundleName = "DeskPet_DeskPetKit"
+
+    /// Locates `DeskPet_DeskPetKit.bundle` for packaged `.app` installs and
+    /// `swift test` runs. SwiftPM's generated `Bundle.module` only checks the
+    /// app bundle root and the compile-time build path, so installs must resolve
+    /// the bundle via `Bundle.main` instead of calling `Bundle.module` directly.
+    static func kitResourceBundle() -> Bundle? {
+        // Packaged app: Makefile copies the bundle into Contents/Resources.
+        if let url = Bundle.main.url(forResource: kitResourceBundleName, withExtension: "bundle"),
+           let bundle = Bundle(url: url) {
+            return bundle
+        }
+
+        // Legacy/manual installs that copied the bundle next to Contents/.
+        let atAppRoot = Bundle.main.bundleURL
+            .appendingPathComponent("\(kitResourceBundleName).bundle", isDirectory: true)
+        if FileManager.default.fileExists(atPath: atAppRoot.path),
+           let bundle = Bundle(url: atAppRoot) {
+            return bundle
+        }
+
+        // `swift test` and local unbundled runs: compile-time build products path.
+        return Bundle.module
+    }
+
     /// `Resources/PetAssets` inside the DeskPetKit resource bundle.
     public static let bundledRoot: URL? = {
-        // `Bundle.module.resourceURL` points at the bundle's Resources dir; the
-        // SPM `.copy` rule places PetAssets directly inside it.
-        guard let resources = Bundle.module.resourceURL else { return nil }
+        guard let bundle = kitResourceBundle(),
+              let resources = bundle.resourceURL else { return nil }
         let root = resources.appendingPathComponent("PetAssets", isDirectory: true)
         return FileManager.default.fileExists(atPath: root.path) ? root : nil
     }()

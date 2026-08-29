@@ -53,8 +53,8 @@ $(ICON): $(ICON_SRC)
 	iconutil -c icns .build/AppIcon.iconset -o $(ICON)
 	rm -rf .build/AppIcon.iconset
 
-# Assemble the .app bundle. Bundle.module resolves the resource bundle from
-# Bundle.main.resourceURL, which is Contents/Resources.
+# Assemble the .app bundle. PetAssetLoader resolves DeskPet_DeskPetKit.bundle
+# from Contents/Resources (codesign rejects extra items at the .app root).
 app: build
 	rm -rf $(BUNDLE)
 	mkdir -p $(BUNDLE)/Contents/MacOS
