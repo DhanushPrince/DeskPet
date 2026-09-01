@@ -45,8 +45,8 @@ from the paw menu item.
 - **Launch at login:** System → Launch at Login. Uses `SMAppService`. Ad-hoc
   and unsigned builds often cannot register; the preference is still saved.
 - **Updates:** System → Check for Updates, or enable Check Updates on Launch
-  (1.5s delay). Reads GitHub Releases at
-  `https://github.com/DhanushPrince/DeskPet/releases`.
+  (1.5s delay). Downloads `DeskPet.dmg` once from GitHub Releases, then asks
+  before replacing the app and relaunching.
 - **Distraction detection:** Focus card. App-name rules work without
   Accessibility; window-title keywords need it. Grant access in System Settings
   › Privacy & Security › Accessibility. Ad-hoc rebuilds can drop the grant

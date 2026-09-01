@@ -45,6 +45,8 @@ public enum Strings {
         public static let focusBack = "Back to work"
         public static let focusEnd = "End Focus"
         public static let openReleaseNotes = "Open Releases"
+        public static let installUpdate = "Update"
+        public static let updateLater = "Later"
     }
 
     // MARK: - Settings window
@@ -97,14 +99,22 @@ public enum Strings {
             + "Development builds only save the preference."
         public static let updates = "Updates"
         public static let checkForUpdates = "Check for Updates"
+        public static let updateNow = "Update now"
         public static let updateCheckOnLaunch = "Check Updates on Launch"
         public static let updateCheckOnLaunchHelp =
-            "When enabled, DeskPet checks the latest GitHub Release on startup. "
+            "When enabled, DeskPet checks the latest GitHub Release on startup, "
+            + "downloads it once, and asks before installing. "
             + "Otherwise it only checks when you ask."
         public static let updateIdle = "Updates have not been checked yet."
         public static let updateChecking = "Checking GitHub Releases…"
         public static func updateAvailable(_ version: String) -> String {
             "Version \(version) is available."
+        }
+        public static func updateDownloading(_ version: String) -> String {
+            "Downloading \(version)…"
+        }
+        public static func updateReady(_ version: String) -> String {
+            "Version \(version) is downloaded. Update now."
         }
         public static func updateCurrent(_ version: String) -> String {
             "You are on the latest version \(version)."
@@ -237,8 +247,8 @@ public enum Strings {
         ]
 
         public static let updateAvailable: [(String) -> String] = [
-            { "Version \($0) is available. Want to see what's new?" },
-            { "DeskPet has a new version: \($0)." }
+            { "Version \($0) is ready to install." },
+            { "DeskPet \($0) is downloaded. Update now?" }
         ]
 
         /// Picks one interpolating variant and applies it.

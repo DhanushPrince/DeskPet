@@ -322,6 +322,11 @@ public struct SettingsView: View {
                 Button(Strings.SettingsLabels.checkForUpdates) {
                     state.checkForUpdates()
                 }
+                if state.canInstallUpdate {
+                    Button(Strings.SettingsLabels.updateNow) {
+                        state.installReadyUpdate()
+                    }
+                }
                 Text(state.updateStatusMessage)
                     .font(.caption)
                     .foregroundStyle(.secondary)

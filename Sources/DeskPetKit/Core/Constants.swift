@@ -16,6 +16,10 @@ public enum Constants {
     public static let releasesURL = URL(
         string: "https://github.com/DhanushPrince/DeskPet/releases"
     )!
+    /// Stable asset URL; the same file the README download link serves.
+    public static let dmgDownloadURL = URL(
+        string: "https://github.com/DhanushPrince/DeskPet/releases/latest/download/DeskPet.dmg"
+    )!
 
     // MARK: Window geometry
 

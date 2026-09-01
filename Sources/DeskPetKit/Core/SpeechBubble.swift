@@ -57,6 +57,8 @@ public enum BubbleActionID {
     public static let focusBack = "focus:back"
     public static let focusEnd = "focus:end"
     public static let openReleaseNotes = "app:open-release-notes"
+    public static let installUpdate = "app:install-update"
+    public static let dismissUpdate = "app:dismiss-update"
 }
 
 /// Bubble identifiers, also matching the originals.

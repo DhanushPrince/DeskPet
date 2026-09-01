@@ -19,6 +19,7 @@ public final class AppState {
     @ObservationIgnored public let statsStore: StatsStore
     @ObservationIgnored public let distractionDetector: DistractionDetector
     @ObservationIgnored public let updateChecker: UpdateChecking
+    @ObservationIgnored public let updateInstaller: UpdateInstalling
     @ObservationIgnored private let displayWatcher = DisplayChangeWatcher()
     @ObservationIgnored private let clock: DeskPetClock
 
@@ -37,6 +38,7 @@ public final class AppState {
     @ObservationIgnored private var focusEndTimer: Timer?
     @ObservationIgnored private var focusBadgeTimer: Timer?
     @ObservationIgnored private var updateCheckTask: Task<Void, Never>?
+    @ObservationIgnored private var stagedAppURL: URL?
 
     // MARK: Observable state
 
@@ -65,6 +67,8 @@ public final class AppState {
         status: .idle,
         currentVersion: AppInfo.version
     )
+    public private(set) var updateInstallPhase: UpdateInstallPhase = .idle
+    public var canInstallUpdate: Bool { updateInstallPhase == .readyToInstall }
 
     /// Checks GitHub Releases. Manual checks from settings also show a bubble
     /// when a newer version exists, matching the Electron IPC handler.
@@ -86,7 +90,17 @@ public final class AppState {
         let result = await updateChecker.check(current: current)
         guard !Task.isCancelled else { return }
         await MainActor.run { [weak self] in
-            self?.applyUpdateCheck(result, notifyAvailable: notifyAvailable)
+            self?.applyUpdateCheck(result)
+        }
+        if result.status == .available {
+            await prepareDownloadedUpdate(result)
+            guard !Task.isCancelled else { return }
+            await MainActor.run { [weak self] in
+                guard let self, self.updateInstallPhase == .readyToInstall else { return }
+                if notifyAvailable, let version = result.latestVersion {
+                    self.showUpdateAvailableNotice(version: version)
+                }
+            }
         }
     }
 
@@ -95,11 +109,14 @@ public final class AppState {
         clock: DeskPetClock = SystemClock(),
         random: @escaping BreakRunPhysics.RandomSource = BreakRunPhysics.systemRandom,
         activeWindowReader: @escaping () throws -> ActiveWindowReading = ActiveWindowReader.read,
-        updateChecker: UpdateChecking = GitHubUpdateChecker()
+        updateChecker: UpdateChecking = GitHubUpdateChecker(),
+        updateInstaller: UpdateInstalling? = nil
     ) {
         self.persistence = persistence
         self.clock = clock
         self.updateChecker = updateChecker
+        self.updateInstaller = updateInstaller
+            ?? FileUpdateInstaller(supportDirectory: persistence.supportDirectory)
         PetAssetLoader.supportDirectory = persistence.supportDirectory
         let loaded = persistence.settings
         self.settings = loaded
@@ -227,6 +244,8 @@ public final class AppState {
     public func stop() {
         updateCheckTask?.cancel()
         updateCheckTask = nil
+        stagedAppURL = nil
+        updateInstallPhase = .idle
         scheduler.stop()
         displayWatcher.stop()
         breakRunner.cancel()
@@ -591,8 +610,12 @@ public final class AppState {
         }
     }
 
-    private func applyUpdateCheck(_ result: UpdateCheckResult, notifyAvailable: Bool) {
+    private func applyUpdateCheck(_ result: UpdateCheckResult) {
         lastUpdateCheck = result
+        if result.status != .available {
+            updateInstallPhase = .idle
+            stagedAppURL = nil
+        }
         switch result.status {
         case .available:
             if let version = result.latestVersion {
@@ -607,13 +630,84 @@ public final class AppState {
         case .idle:
             updateStatusMessage = Strings.SettingsLabels.updateIdle
         }
+    }
 
-        if notifyAvailable, result.status == .available, let version = result.latestVersion {
-            showUpdateAvailableNotice(version: version)
+    private func prepareDownloadedUpdate(_ result: UpdateCheckResult) async {
+        let version = result.latestVersion ?? ""
+        let url = result.dmgURL ?? Constants.dmgDownloadURL
+        await MainActor.run { [weak self] in
+            self?.updateInstallPhase = .downloading
+            self?.updateStatusMessage = Strings.SettingsLabels.updateDownloading(version)
+        }
+        do {
+            let dmg: URL
+            if let cached = updateInstaller.cachedDMG(
+                version: version,
+                expectedByteCount: result.dmgByteCount
+            ) {
+                dmg = cached
+            } else {
+                dmg = try await updateInstaller.download(
+                    from: url,
+                    version: version,
+                    expectedByteCount: result.dmgByteCount
+                )
+            }
+            guard !Task.isCancelled else { return }
+            let staged = try updateInstaller.stageApp(fromDMG: dmg, currentVersion: AppInfo.version)
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.stagedAppURL = staged
+                self.updateInstallPhase = .readyToInstall
+                self.updateStatusMessage = Strings.SettingsLabels.updateReady(version)
+            }
+        } catch {
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.updateInstallPhase = .idle
+                self.stagedAppURL = nil
+                self.updateStatusMessage = Strings.SettingsLabels.updateError(
+                    Self.installErrorMessage(error)
+                )
+            }
         }
     }
 
-    /// Ported from `showUpdateAvailableNotice`.
+    /// Replaces the running bundle with the staged app, then quits so the helper can relaunch.
+    public func installReadyUpdate() {
+        guard updateInstallPhase == .readyToInstall, let stagedAppURL else { return }
+        updateInstallPhase = .installing
+        hideBubble()
+        stateMachine.settleAfterTransientState()
+        do {
+            try updateInstaller.installAndRelaunch(
+                destination: Bundle.main.bundleURL,
+                stagedApp: stagedAppURL
+            )
+            if Bundle.main.bundleIdentifier == "com.dhanushprince.deskpet" {
+                NSApp.perform(#selector(NSApplication.terminate(_:)), with: nil, afterDelay: 0)
+            }
+        } catch {
+            updateInstallPhase = .readyToInstall
+            updateStatusMessage = Strings.SettingsLabels.updateError(Self.installErrorMessage(error))
+        }
+    }
+
+    private static func installErrorMessage(_ error: Error) -> String {
+        guard let error = error as? UpdateInstallerError else {
+            return error.localizedDescription
+        }
+        switch error {
+        case .downloadFailed: return "Couldn’t download the installer"
+        case .sizeMismatch: return "Downloaded file was incomplete"
+        case .mountFailed: return "Couldn’t open the installer disk image"
+        case .missingApp: return "The disk image has no DeskPet app"
+        case .notNewer: return "The downloaded app is not newer"
+        case .installFailed: return "Couldn’t start the installer"
+        }
+    }
+
+    /// Shown once the DMG is cached and the new app is staged.
     private func showUpdateAvailableNotice(version: String) {
         guard stateMachine.blockingMode == nil else { return }
         ensurePetVisible()
@@ -623,9 +717,17 @@ public final class AppState {
             message: Strings.Bubble.pick(Strings.Bubble.updateAvailable, version),
             actions: [
                 BubbleAction(
-                    id: BubbleActionID.openReleaseNotes,
-                    label: Strings.Actions.openReleaseNotes,
+                    id: BubbleActionID.installUpdate,
+                    label: Strings.Actions.installUpdate,
                     kind: .primary
+                ),
+                BubbleAction(
+                    id: BubbleActionID.dismissUpdate,
+                    label: Strings.Actions.updateLater
+                ),
+                BubbleAction(
+                    id: BubbleActionID.openReleaseNotes,
+                    label: Strings.Actions.openReleaseNotes
                 )
             ],
             autoDismissAfter: Constants.updateAvailableBubbleDuration
@@ -670,6 +772,11 @@ public final class AppState {
             hideBubble()
             stateMachine.settleAfterTransientState()
             NSWorkspace.shared.open(lastUpdateCheck.releaseURL)
+        case BubbleActionID.installUpdate:
+            installReadyUpdate()
+        case BubbleActionID.dismissUpdate:
+            hideBubble()
+            stateMachine.settleAfterTransientState()
         default:
             NSLog("DeskPet: unhandled bubble action \(id)")
         }

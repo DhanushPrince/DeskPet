@@ -8,11 +8,21 @@ public enum UpdateCheckStatus: String, Equatable, Sendable {
     case error
 }
 
+/// Local progress after GitHub reports a newer tag.
+public enum UpdateInstallPhase: String, Equatable, Sendable {
+    case idle
+    case downloading
+    case readyToInstall
+    case installing
+}
+
 public struct UpdateCheckResult: Equatable, Sendable {
     public var status: UpdateCheckStatus
     public var currentVersion: String
     public var latestVersion: String?
     public var releaseURL: URL
+    public var dmgURL: URL?
+    public var dmgByteCount: Int?
     public var error: String?
 
     public init(
@@ -20,12 +30,16 @@ public struct UpdateCheckResult: Equatable, Sendable {
         currentVersion: String,
         latestVersion: String? = nil,
         releaseURL: URL = Constants.releasesURL,
+        dmgURL: URL? = nil,
+        dmgByteCount: Int? = nil,
         error: String? = nil
     ) {
         self.status = status
         self.currentVersion = currentVersion
         self.latestVersion = latestVersion
         self.releaseURL = releaseURL
+        self.dmgURL = dmgURL
+        self.dmgByteCount = dmgByteCount
         self.error = error
     }
 
@@ -73,10 +87,17 @@ public final class GitHubUpdateChecker: UpdateChecking {
 
     /// Interprets a GitHub Releases JSON payload. Exposed so tests need no network.
     public static func parse(_ data: Data, currentVersion: String) -> UpdateCheckResult {
+        struct Asset: Decodable {
+            var name: String?
+            var size: Int?
+            var browser_download_url: String?
+        }
+
         struct Payload: Decodable {
             var tag_name: String?
             var html_url: String?
             var name: String?
+            var assets: [Asset]?
         }
 
         do {
@@ -91,11 +112,17 @@ public final class GitHubUpdateChecker: UpdateChecking {
             }
             let releaseURL = payload.html_url.flatMap(URL.init(string:)) ?? Constants.releasesURL
             let available = Versions.compare(latestVersion, currentVersion) > 0
+            let dmgAsset = payload.assets?.first {
+                ($0.name ?? "").caseInsensitiveCompare("DeskPet.dmg") == .orderedSame
+            }
+            let assetURL = dmgAsset.flatMap { URL(string: $0.browser_download_url ?? "") }
             return UpdateCheckResult(
                 status: available ? .available : .upToDate,
                 currentVersion: currentVersion,
                 latestVersion: latestVersion,
-                releaseURL: releaseURL
+                releaseURL: releaseURL,
+                dmgURL: assetURL ?? (available ? Constants.dmgDownloadURL : nil),
+                dmgByteCount: dmgAsset?.size
             )
         } catch {
             return UpdateCheckResult(
