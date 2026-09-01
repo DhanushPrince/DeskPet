@@ -18,7 +18,11 @@ public final class AppState {
     @ObservationIgnored public let breakRunner: BreakRunner
     @ObservationIgnored public let statsStore: StatsStore
     @ObservationIgnored public let distractionDetector: DistractionDetector
+    @ObservationIgnored public let meetingHideWatcher: MeetingHideWatcher
     @ObservationIgnored public let updateChecker: UpdateChecking
+    /// Watchers that poll only after `start()`, so constructing AppState in
+    /// tests does not spin timers.
+    @ObservationIgnored private var isRunning = false
     @ObservationIgnored public let updateInstaller: UpdateInstalling
     @ObservationIgnored private let displayWatcher = DisplayChangeWatcher()
     @ObservationIgnored private let clock: DeskPetClock
@@ -49,6 +53,8 @@ public final class AppState {
     public private(set) var blockingMode: BlockingMode?
     /// Mirrors the detector so the settings window can show what it sees.
     public private(set) var distractionStatus = DistractionStatus()
+    /// Temporary hide while Teams is in a call. Not persisted.
+    public private(set) var hiddenForMeeting = false
 
     /// Written through to `UserDefaults` and applied to the running pet.
     public var settings: Settings {
@@ -109,6 +115,7 @@ public final class AppState {
         clock: DeskPetClock = SystemClock(),
         random: @escaping BreakRunPhysics.RandomSource = BreakRunPhysics.systemRandom,
         activeWindowReader: @escaping () throws -> ActiveWindowReading = ActiveWindowReader.read,
+        teamsCallActive: @escaping () -> Bool = TeamsCallDetector.isInCall,
         updateChecker: UpdateChecking = GitHubUpdateChecker(),
         updateInstaller: UpdateInstalling? = nil
     ) {
@@ -132,6 +139,7 @@ public final class AppState {
             clock: clock,
             reader: activeWindowReader
         )
+        self.meetingHideWatcher = MeetingHideWatcher(isInCall: teamsCallActive)
 
         wire()
     }
@@ -219,11 +227,16 @@ public final class AppState {
             self?.distractionStatus = status
         }
 
+        meetingHideWatcher.onMeetingChange = { [weak self] inMeeting in
+            self?.applyMeetingHide(inMeeting)
+        }
+
         applySettings()
     }
 
     /// Shows the pet unless the user hid it, then starts the timers.
     public func start() {
+        isRunning = true
         if persistence.petHiddenByUser {
             NSLog("DeskPet: pet stays hidden (hidden by user)")
         } else {
@@ -232,6 +245,7 @@ public final class AppState {
         rollStatsDateIfNeeded()
         scheduler.start()
         displayWatcher.start()
+        meetingHideWatcher.update(enabled: settings.hidePetDuringMeetings)
         syncDerivedState()
         syncLaunchAtLoginFromSystem()
         if settings.checkUpdatesOnLaunchEnabled {
@@ -242,6 +256,7 @@ public final class AppState {
     }
 
     public func stop() {
+        isRunning = false
         updateCheckTask?.cancel()
         updateCheckTask = nil
         stagedAppURL = nil
@@ -250,6 +265,7 @@ public final class AppState {
         displayWatcher.stop()
         breakRunner.cancel()
         distractionDetector.stop()
+        meetingHideWatcher.stop()
         stopFocusTimers()
         cancelPendingSequences()
         stateCycleTimer?.invalidate()
@@ -484,6 +500,9 @@ public final class AppState {
         // Interval or enablement changes take effect without a restart.
         scheduler.update(settings: settings)
         distractionDetector.update(settings: settings)
+        if isRunning {
+            meetingHideWatcher.update(enabled: settings.hidePetDuringMeetings)
+        }
         LoginItemService.apply(enabled: settings.launchAtLoginEnabled)
     }
 
@@ -576,12 +595,23 @@ public final class AppState {
     }
 
     /// Ported from `ensurePetWindowVisible`: a reminder must not resurrect a pet
-    /// the user deliberately hid.
+    /// the user deliberately hid, and a Teams call must keep it off-screen.
     private func ensurePetVisible() {
         guard !persistence.petHiddenByUser else { return }
+        guard !hiddenForMeeting else { return }
         guard !petWindow.isVisible else { return }
         petWindow.show()
         syncDerivedState()
+    }
+
+    private func applyMeetingHide(_ inMeeting: Bool) {
+        hiddenForMeeting = inMeeting
+        if inMeeting {
+            petWindow.hide()
+            syncDerivedState()
+        } else {
+            ensurePetVisible()
+        }
     }
 
     // MARK: - Interactions

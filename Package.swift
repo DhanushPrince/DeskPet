@@ -19,7 +19,10 @@ let package = Package(
             path: "Sources/DeskPetKit",
             resources: [.copy("Resources/PetAssets")],
             swiftSettings: [.swiftLanguageMode(.v5)],
-            linkerSettings: [.linkedFramework("ServiceManagement")]
+            linkerSettings: [
+                .linkedFramework("ServiceManagement"),
+                .linkedFramework("IOKit")
+            ]
         ),
         .executableTarget(
             name: "DeskPet",

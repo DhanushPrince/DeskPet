@@ -68,6 +68,10 @@ public enum Strings {
         public static let focusDuration = "Focus Duration"
         public static let startFocus = "Start Focus"
         public static let stopFocus = "Stop Focus"
+        public static let hidePetDuringMeetings = "Hide Pet During Meetings"
+        public static let hidePetDuringMeetingsHelp =
+            "Hides the pet while Microsoft Teams reports an active call. "
+            + "No Accessibility permission required."
         public static let enableDistractionDetection = "Enable Distraction Detection"
         public static let detectionGrace = "Detection Grace"
         public static let blockedApps = "Blocked Apps"

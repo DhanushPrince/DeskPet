@@ -18,6 +18,7 @@ public struct Settings: Equatable, Codable, Sendable {
     public var distractionGraceSeconds: Int
     public var distractionBlockedApps: [String]
     public var distractionBlockedKeywords: [String]
+    public var hidePetDuringMeetings: Bool
 
     /// `language` is intentionally absent: the Electron build was English-only
     /// by the final commit, and the i18n indirection was dropped in the rewrite.
@@ -38,6 +39,7 @@ public struct Settings: Equatable, Codable, Sendable {
         case distractionGraceSeconds
         case distractionBlockedApps
         case distractionBlockedKeywords
+        case hidePetDuringMeetings
     }
 
     /// Ported from `DEFAULT_SETTINGS`.
@@ -59,7 +61,8 @@ public struct Settings: Equatable, Codable, Sendable {
         distractionBlockedKeywords: [
             "youtube", "youtu.be", "twitter", "x.com", "instagram",
             "reddit", "tiktok", "netflix", "twitch", "facebook"
-        ]
+        ],
+        hidePetDuringMeetings: true
     )
 
     /// Missing keys fall back to defaults, so a partial or older payload decodes
@@ -108,6 +111,7 @@ public struct Settings: Equatable, Codable, Sendable {
         distractionBlockedKeywords = value(
             .distractionBlockedKeywords, defaults.distractionBlockedKeywords
         )
+        hidePetDuringMeetings = value(.hidePetDuringMeetings, defaults.hidePetDuringMeetings)
     }
 
     public init(
@@ -125,7 +129,8 @@ public struct Settings: Equatable, Codable, Sendable {
         distractionDetectionEnabled: Bool,
         distractionGraceSeconds: Int,
         distractionBlockedApps: [String],
-        distractionBlockedKeywords: [String]
+        distractionBlockedKeywords: [String],
+        hidePetDuringMeetings: Bool = true
     ) {
         self.petAppearanceID = petAppearanceID
         self.customPetAppearance = customPetAppearance
@@ -142,6 +147,7 @@ public struct Settings: Equatable, Codable, Sendable {
         self.distractionGraceSeconds = distractionGraceSeconds
         self.distractionBlockedApps = distractionBlockedApps
         self.distractionBlockedKeywords = distractionBlockedKeywords
+        self.hidePetDuringMeetings = hidePetDuringMeetings
     }
 }
 

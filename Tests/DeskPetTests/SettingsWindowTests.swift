@@ -233,6 +233,10 @@ struct SettingsEditingTests {
         #expect(reloaded.focusDurationMinutes == 45)
         #expect(reloaded.distractionDetectionEnabled)
         #expect(reloaded.distractionBlockedApps == ["Slack", "Steam"])
+        #expect(reloaded.hidePetDuringMeetings)
+
+        state.updateSettings { $0.hidePetDuringMeetings = false }
+        #expect(!state.persistence.settings.hidePetDuringMeetings)
     }
 
     @Test("an out-of-range value written directly is corrected on load")

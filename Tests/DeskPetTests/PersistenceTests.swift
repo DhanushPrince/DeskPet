@@ -23,6 +23,7 @@ struct SettingsNormalizationTests {
         #expect(defaults.hydrationIntervalMinutes == 90)
         #expect(defaults.focusDurationMinutes == 25)
         #expect(!defaults.distractionDetectionEnabled)
+        #expect(defaults.hidePetDuringMeetings)
         #expect(defaults.distractionGraceSeconds == 8)
         #expect(!defaults.launchAtLoginEnabled)
         #expect(!defaults.checkUpdatesOnLaunchEnabled)

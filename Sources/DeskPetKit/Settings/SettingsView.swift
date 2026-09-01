@@ -211,6 +211,14 @@ public struct SettingsView: View {
 
             Divider()
 
+            Toggle(Strings.SettingsLabels.hidePetDuringMeetings, isOn: boolBinding(
+                get: { $0.hidePetDuringMeetings },
+                set: { $0.hidePetDuringMeetings = $1 }
+            ))
+            Text(Strings.SettingsLabels.hidePetDuringMeetingsHelp)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
             Toggle(Strings.SettingsLabels.enableDistractionDetection, isOn: boolBinding(
                 get: { $0.distractionDetectionEnabled },
                 set: { $0.distractionDetectionEnabled = $1 }
