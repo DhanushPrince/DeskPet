@@ -4,5 +4,9 @@
 <dict>
 	<!-- Hardened runtime, no App Sandbox. Login items and Accessibility
 	     continue to work without extra TCC entitlements. -->
+	<!-- Required so NSAppleScript can read Brave/Chrome/Safari active-tab URLs
+	     under the hardened runtime (distraction keywords). -->
+	<key>com.apple.security.automation.apple-events</key>
+	<true/>
 </dict>
 </plist>

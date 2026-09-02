@@ -36,5 +36,7 @@
 	<false/>
 	<key>NSSupportsSuddenTermination</key>
 	<false/>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>DeskPet reads the active browser tab URL during Focus so blocked keywords like youtube can match in Brave, Chrome, and Safari.</string>
 </dict>
 </plist>

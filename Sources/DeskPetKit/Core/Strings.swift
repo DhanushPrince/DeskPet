@@ -82,6 +82,10 @@ public enum Strings {
             "DeskPet needs Accessibility permission to read the active window's "
             + "title. Grant it in System Settings › Privacy & Security › "
             + "Accessibility, then re-enable detection."
+        public static let browserAutomationHelp =
+            "Blocked keywords in Safari, Chrome, or Brave need Automation permission "
+            + "so DeskPet can read the active tab URL. Allow DeskPet to control your "
+            + "browser in System Settings › Privacy & Security › Automation."
         public static let grantAccessibility = "Request Permission"
         public static let openPrivacySettings = "Open Privacy Settings"
 

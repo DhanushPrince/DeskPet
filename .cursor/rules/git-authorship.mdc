@@ -1,0 +1,38 @@
+---
+description: Strict — never attribute commits/PRs to Cursor Agent when committing or pushing
+alwaysApply: true
+---
+
+# Git authorship (strict)
+
+Commits and pushes for this repo must appear as **DhanushPrince only**. Never Cursor Agent.
+
+## Never
+
+- Add `Co-authored-by: Cursor <cursoragent@cursor.com>` (or any `cursoragent@` / “Made with Cursor” trailer).
+- Commit or push with author/committer set to Cursor Agent.
+- Leave a Cursor co-author badge on GitHub after a commit the agent created.
+
+## When committing
+
+1. Author and committer must be **DhanushPrince** `<r.dhanush307@gmail.com>` (repo local `user.name` / `user.email`).
+2. After any `git commit` created in-agent, **verify** before push:
+   ```bash
+   git log -1 --format='%B'
+   ```
+   If a Cursor trailer is present, strip it **before** push (do not push the trailed commit):
+   ```bash
+   # Prefer commit-tree rewrite so Cursor cannot re-inject the trailer:
+   TREE=$(git rev-parse HEAD^{tree})
+   PARENT=$(git rev-parse HEAD^)
+   NEW=$(printf '%s\n' "$(git log -1 --format=%s)" | \
+     GIT_AUTHOR_NAME='DhanushPrince' GIT_AUTHOR_EMAIL='r.dhanush307@gmail.com' \
+     GIT_COMMITTER_NAME='DhanushPrince' GIT_COMMITTER_EMAIL='r.dhanush307@gmail.com' \
+     git commit-tree "$TREE" -p "$PARENT")
+   git reset --hard "$NEW"
+   ```
+3. Only then `git push`.
+
+## User setting (remind once if trailer keeps coming back)
+
+Cursor Settings → **Agents / Git & PRs → Attribution** → turn **off** commit and PR attribution.

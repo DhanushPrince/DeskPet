@@ -28,3 +28,4 @@ When cutting a GitHub release (`vX.Y.Z`) or shipping `DeskPet.dmg`:
 
 - Tag / upload a DMG while `Info.plist` still has the previous version — Check for Updates fails with **"The downloaded app is not newer"** (hit on v1.0.2 and v1.0.3).
 - Point `vX.Y.Z` at a commit that does not include the matching plist bump.
+- Push commits that include `Co-authored-by: Cursor` — see [`git-authorship.mdc`](git-authorship.mdc).

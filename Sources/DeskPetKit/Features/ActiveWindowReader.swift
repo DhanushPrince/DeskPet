@@ -59,23 +59,55 @@ public enum ActiveWindowReader {
     /// working; only title-based keyword matching is lost. The Electron build
     /// could not degrade this way — its single `osascript` call supplied both
     /// values or neither.
+    ///
+    /// Known browsers additionally expose the active tab URL via Apple Events;
+    /// when present, that string replaces the AX title for keyword matching.
     public static func read() throws -> ActiveWindowReading {
+        try read(tabReader: BrowserTabReader.readActiveTab)
+    }
+
+    static func read(
+        tabReader: (String?) -> BrowserTabReader.ActiveTab?
+    ) throws -> ActiveWindowReading {
         guard let app = NSWorkspace.shared.frontmostApplication else {
             throw ActiveWindowError.noFrontmostApplication
         }
         let name = app.localizedName ?? ""
+        let bundleID = app.bundleIdentifier
 
         do {
-            let title = try focusedWindowTitle(pid: app.processIdentifier)
+            let axTitle = try focusedWindowTitle(pid: app.processIdentifier)
+            let windowTitle = enrichedWindowTitle(
+                axTitle: axTitle,
+                bundleID: bundleID,
+                tabReader: tabReader
+            )
             return ActiveWindowReading(
-                info: ActiveWindowInfo(appName: name, windowTitle: title ?? "")
+                info: ActiveWindowInfo(appName: name, windowTitle: windowTitle)
             )
         } catch ActiveWindowError.permissionDenied {
+            let windowTitle = enrichedWindowTitle(
+                axTitle: nil,
+                bundleID: bundleID,
+                tabReader: tabReader
+            )
             return ActiveWindowReading(
-                info: ActiveWindowInfo(appName: name, windowTitle: ""),
-                titlePermissionDenied: true
+                info: ActiveWindowInfo(appName: name, windowTitle: windowTitle),
+                titlePermissionDenied: windowTitle.isEmpty
             )
         }
+    }
+
+    /// Prefer active-tab title + URL when the browser script returns a URL.
+    static func enrichedWindowTitle(
+        axTitle: String?,
+        bundleID: String?,
+        tabReader: (String?) -> BrowserTabReader.ActiveTab?
+    ) -> String {
+        if let tab = tabReader(bundleID), !tab.url.isEmpty {
+            return tab.keywordContext
+        }
+        return axTitle ?? ""
     }
 
     /// Focused window title via the accessibility API, or nil when the app

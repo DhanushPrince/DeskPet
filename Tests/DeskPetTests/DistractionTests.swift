@@ -537,3 +537,111 @@ struct DistractionIntegrationTests {
         #expect(state.stats.focusWarnings == 2, "the cooldown resets between sessions")
     }
 }
+
+@Suite("Browser tab reader")
+struct BrowserTabReaderTests {
+
+    private struct StubRunner: AppleScriptRunning {
+        let result: String?
+
+        func run(source: String) -> String? { result }
+    }
+
+    @Test("supported bundle IDs map to AppleScript application names")
+    func bundleIDMap() {
+        #expect(BrowserTabReader.supportedBundleIDs["com.brave.Browser"] == "Brave Browser")
+        #expect(BrowserTabReader.supportedBundleIDs["com.google.Chrome"] == "Google Chrome")
+        #expect(BrowserTabReader.supportedBundleIDs["com.apple.Safari"] == "Safari")
+    }
+
+    @Test("Chromium scripts query only the active tab of the front window")
+    func chromiumScriptUsesActiveTabOnly() {
+        let script = BrowserTabReader.script(forBundleID: "com.brave.Browser")!
+        #expect(script.contains("tell application \"Brave Browser\""))
+        #expect(script.contains("active tab of front window"))
+        #expect(!script.contains("repeat"))
+        #expect(!script.contains("tabs of"))
+    }
+
+    @Test("Safari script queries only the current tab of the front window")
+    func safariScriptUsesCurrentTabOnly() {
+        let script = BrowserTabReader.script(forBundleID: "com.apple.Safari")!
+        #expect(script.contains("tell application \"Safari\""))
+        #expect(script.contains("current tab of front window"))
+        #expect(!script.contains("repeat"))
+    }
+
+    @Test("parses title and URL from the two-line script result")
+    func parseScriptResult() {
+        let tab = BrowserTabReader.parseScriptResult(
+            "YouTube\nhttps://www.youtube.com/"
+        )
+        #expect(tab?.title == "YouTube")
+        #expect(tab?.url == "https://www.youtube.com/")
+        #expect(tab?.keywordContext == "YouTube https://www.youtube.com/")
+    }
+
+    @Test("YouTube URL matches blocked keywords when injected into the classifier")
+    func youtubeURLMatchesKeyword() {
+        let tab = BrowserTabReader.parseScriptResult(
+            "YouTube\nhttps://www.youtube.com/"
+        )!
+        var settings = Settings.defaults
+        settings.distractionBlockedKeywords = ["youtube"]
+        #expect(
+            DistractionClassifier.classify(
+                ActiveWindowInfo(appName: "Brave Browser", windowTitle: tab.keywordContext),
+                settings: settings
+            ) == "keyword:youtube"
+        )
+    }
+
+    @Test("script failure does not match YouTube from the app name alone")
+    func failureDoesNotMatchAppName() {
+        let runner = StubRunner(result: nil)
+        let tab = BrowserTabReader.readActiveTab(
+            bundleID: "com.brave.Browser",
+            runner: runner
+        )
+        #expect(tab == nil)
+
+        var settings = Settings.defaults
+        settings.distractionBlockedKeywords = ["youtube"]
+        #expect(
+            DistractionClassifier.classify(
+                ActiveWindowInfo(appName: "Brave Browser", windowTitle: ""),
+                settings: settings
+            ) == nil
+        )
+    }
+
+    @Test("empty URL keeps AX title via enrichedWindowTitle")
+    func emptyURLFallsBackToAX() {
+        let runner = StubRunner(result: "YouTube\n")
+        let tabReader: (String?) -> BrowserTabReader.ActiveTab? = { bundleID in
+            BrowserTabReader.readActiveTab(bundleID: bundleID, runner: runner)
+        }
+        #expect(
+            ActiveWindowReader.enrichedWindowTitle(
+                axTitle: "Brave",
+                bundleID: "com.brave.Browser",
+                tabReader: tabReader
+            ) == "Brave"
+        )
+    }
+
+    @Test("non-empty URL replaces AX title for keyword context")
+    func urlReplacesAXTitle() {
+        let runner = StubRunner(result: "YouTube\nhttps://www.youtube.com/")
+        let tabReader: (String?) -> BrowserTabReader.ActiveTab? = { bundleID in
+            BrowserTabReader.readActiveTab(bundleID: bundleID, runner: runner)
+        }
+        #expect(
+            ActiveWindowReader.enrichedWindowTitle(
+                axTitle: "Brave",
+                bundleID: "com.brave.Browser",
+                tabReader: tabReader
+            ) == "YouTube https://www.youtube.com/"
+        )
+    }
+}

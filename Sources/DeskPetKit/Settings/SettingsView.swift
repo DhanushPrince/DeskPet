@@ -223,6 +223,9 @@ public struct SettingsView: View {
                 get: { $0.distractionDetectionEnabled },
                 set: { $0.distractionDetectionEnabled = $1 }
             ))
+            Text(Strings.SettingsLabels.browserAutomationHelp)
+                .font(.caption)
+                .foregroundStyle(.secondary)
 
             NumberRow(
                 label: Strings.SettingsLabels.detectionGrace,
