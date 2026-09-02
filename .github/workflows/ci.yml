@@ -14,3 +14,51 @@ jobs:
         run: make app
       - name: Run tests
         run: make test
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        env:
+          GITLEAKS_VERSION: "8.24.2"
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz gitleaks
+          sudo mv gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Gitleaks
+        run: gitleaks detect --source . --verbose
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: mobsfscan
+        run: |
+          pip install "mobsfscan==1.0.0"
+          mobsfscan --type ios Sources Support
+
+      - name: Install OSV-Scanner
+        env:
+          OSV_SCANNER_VERSION: "2.2.3"
+        run: |
+          curl -sSfL "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64" \
+            -o /usr/local/bin/osv-scanner
+          sudo chmod +x /usr/local/bin/osv-scanner
+          osv-scanner --version
+
+      # Exit 0 = clean, 1 = known CVEs (fail), 128 = no packages to scan (ok here).
+      - name: OSV-Scanner
+        run: |
+          set +e
+          osv-scanner scan source --recursive .
+          status=$?
+          if [ "$status" -eq 0 ] || [ "$status" -eq 128 ]; then
+            exit 0
+          fi
+          exit "$status"

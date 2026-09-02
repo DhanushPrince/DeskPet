@@ -34,6 +34,15 @@ ad-hoc with the hardened runtime (`Support/DeskPet.entitlements`). Gatekeeper
 will still show an “unverified developer” prompt until a Developer ID identity
 and notarization are available (`make notarize` documents that gap).
 
+CI also runs three scanners on Linux (secrets, Swift/plist SAST, SPM CVEs).
+Local mirrors:
+
+```
+gitleaks detect --source .
+mobsfscan --type ios Sources Support
+osv-scanner scan source --recursive .
+```
+
 ## Using the app
 
 DeskPet is a menu-bar accessory (`LSUIElement`): no Dock icon. Open **Settings**
