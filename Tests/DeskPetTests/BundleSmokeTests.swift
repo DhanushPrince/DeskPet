@@ -39,7 +39,7 @@ struct BundleSmokeTests {
     func bundleIdentity() throws {
         let plist = try loadInfoPlist()
         #expect(plist["CFBundleIdentifier"] as? String == "com.dhanushprince.deskpet")
-        #expect(plist["CFBundleShortVersionString"] as? String == "1.0.3")
+        #expect(plist["CFBundleShortVersionString"] as? String == "1.0.4")
         #expect(plist["CFBundleExecutable"] as? String == "DeskPet")
         #expect(plist["CFBundlePackageType"] as? String == "APPL")
     }
