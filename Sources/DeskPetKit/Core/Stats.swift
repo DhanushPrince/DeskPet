@@ -29,6 +29,38 @@ public struct DayStats: Equatable, Codable, Sendable {
     }
 }
 
+/// Aggregate counters across a set of days, used by the Settings history
+/// summary. Pure arithmetic over `DayStats` so it can be unit-tested without
+/// AppKit.
+public struct StatsTotals: Equatable, Sendable {
+    public var breaksTaken: Int
+    public var watersLogged: Int
+    public var focusMinutes: Int
+    public var focusWarnings: Int
+
+    public init(
+        breaksTaken: Int = 0,
+        watersLogged: Int = 0,
+        focusMinutes: Int = 0,
+        focusWarnings: Int = 0
+    ) {
+        self.breaksTaken = breaksTaken
+        self.watersLogged = watersLogged
+        self.focusMinutes = focusMinutes
+        self.focusWarnings = focusWarnings
+    }
+
+    /// Sum of every counter across `days`.
+    public static func summing<S: Sequence>(_ days: S) -> StatsTotals where S.Element == DayStats {
+        days.reduce(into: StatsTotals()) { totals, day in
+            totals.breaksTaken += day.breaksTaken
+            totals.watersLogged += day.watersLogged
+            totals.focusMinutes += day.focusMinutes
+            totals.focusWarnings += day.focusWarnings
+        }
+    }
+}
+
 /// Keyed by `YYYY-MM-DD`, matching `StatsHistory`.
 public typealias StatsHistory = [String: DayStats]
 

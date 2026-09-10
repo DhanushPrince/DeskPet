@@ -19,6 +19,10 @@ public struct Settings: Equatable, Codable, Sendable {
     public var distractionBlockedApps: [String]
     public var distractionBlockedKeywords: [String]
     public var hidePetDuringMeetings: Bool
+    public var showBreaksStat: Bool
+    public var showWatersStat: Bool
+    public var showFocusStat: Bool
+    public var showDistractionsStat: Bool
 
     /// `language` is intentionally absent: the Electron build was English-only
     /// by the final commit, and the i18n indirection was dropped in the rewrite.
@@ -40,6 +44,10 @@ public struct Settings: Equatable, Codable, Sendable {
         case distractionBlockedApps
         case distractionBlockedKeywords
         case hidePetDuringMeetings
+        case showBreaksStat
+        case showWatersStat
+        case showFocusStat
+        case showDistractionsStat
     }
 
     /// Ported from `DEFAULT_SETTINGS`.
@@ -62,7 +70,11 @@ public struct Settings: Equatable, Codable, Sendable {
             "youtube", "youtu.be", "twitter", "x.com", "instagram",
             "reddit", "tiktok", "netflix", "twitch", "facebook"
         ],
-        hidePetDuringMeetings: true
+        hidePetDuringMeetings: true,
+        showBreaksStat: true,
+        showWatersStat: true,
+        showFocusStat: true,
+        showDistractionsStat: true
     )
 
     /// Missing keys fall back to defaults, so a partial or older payload decodes
@@ -112,6 +124,10 @@ public struct Settings: Equatable, Codable, Sendable {
             .distractionBlockedKeywords, defaults.distractionBlockedKeywords
         )
         hidePetDuringMeetings = value(.hidePetDuringMeetings, defaults.hidePetDuringMeetings)
+        showBreaksStat = value(.showBreaksStat, defaults.showBreaksStat)
+        showWatersStat = value(.showWatersStat, defaults.showWatersStat)
+        showFocusStat = value(.showFocusStat, defaults.showFocusStat)
+        showDistractionsStat = value(.showDistractionsStat, defaults.showDistractionsStat)
     }
 
     public init(
@@ -130,7 +146,11 @@ public struct Settings: Equatable, Codable, Sendable {
         distractionGraceSeconds: Int,
         distractionBlockedApps: [String],
         distractionBlockedKeywords: [String],
-        hidePetDuringMeetings: Bool = true
+        hidePetDuringMeetings: Bool = true,
+        showBreaksStat: Bool = true,
+        showWatersStat: Bool = true,
+        showFocusStat: Bool = true,
+        showDistractionsStat: Bool = true
     ) {
         self.petAppearanceID = petAppearanceID
         self.customPetAppearance = customPetAppearance
@@ -148,6 +168,10 @@ public struct Settings: Equatable, Codable, Sendable {
         self.distractionBlockedApps = distractionBlockedApps
         self.distractionBlockedKeywords = distractionBlockedKeywords
         self.hidePetDuringMeetings = hidePetDuringMeetings
+        self.showBreaksStat = showBreaksStat
+        self.showWatersStat = showWatersStat
+        self.showFocusStat = showFocusStat
+        self.showDistractionsStat = showDistractionsStat
     }
 }
 

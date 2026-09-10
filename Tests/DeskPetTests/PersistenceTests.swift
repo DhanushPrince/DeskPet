@@ -24,6 +24,10 @@ struct SettingsNormalizationTests {
         #expect(defaults.focusDurationMinutes == 25)
         #expect(!defaults.distractionDetectionEnabled)
         #expect(defaults.hidePetDuringMeetings)
+        #expect(defaults.showBreaksStat)
+        #expect(defaults.showWatersStat)
+        #expect(defaults.showFocusStat)
+        #expect(defaults.showDistractionsStat)
         #expect(defaults.distractionGraceSeconds == 8)
         #expect(!defaults.launchAtLoginEnabled)
         #expect(!defaults.checkUpdatesOnLaunchEnabled)
@@ -40,6 +44,27 @@ struct SettingsNormalizationTests {
         let json = #"{"petAppearanceId":"cat"}"#
         let decoded = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
         #expect(decoded.petAppearanceID == Settings.defaults.petAppearanceID)
+    }
+
+    @Test("older payloads without stat-visibility keys default to all visible")
+    func missingStatVisibilityDefaultsVisible() throws {
+        // A payload from before the feature existed has none of these keys.
+        let json = #"{"petAppearanceId":"lineDog","breakReminderEnabled":true}"#
+        let decoded = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
+        #expect(decoded.showBreaksStat)
+        #expect(decoded.showWatersStat)
+        #expect(decoded.showFocusStat)
+        #expect(decoded.showDistractionsStat)
+    }
+
+    @Test("stored stat-visibility flags are preserved")
+    func statVisibilityPreserved() throws {
+        let json = #"{"showBreaksStat":true,"showWatersStat":true,"showFocusStat":false,"showDistractionsStat":false}"#
+        let decoded = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
+        #expect(decoded.showBreaksStat)
+        #expect(decoded.showWatersStat)
+        #expect(!decoded.showFocusStat)
+        #expect(!decoded.showDistractionsStat)
     }
 
     @Test("valid stored values are preserved")

@@ -152,6 +152,9 @@ public enum Strings {
         public static let warnings = "Distractions"
         public static let resetToday = "Reset Today"
         public static let history = "History"
+        public static let historyLast7Days = "Last 7 days"
+        public static let historyLegendTitle = "What the icons mean"
+        public static let customizeStats = "Customize"
 
         public static let about = "About"
         public static let version = "Version"

@@ -24,6 +24,8 @@ enum SettingsStyle {
 public struct SettingsView: View {
     @Bindable var state: AppState
     @State private var customEditorOpen = false
+    @State private var historyLegendOpen = false
+    @State private var metricPickerOpen = false
 
     public init(state: AppState) {
         self.state = state
@@ -350,40 +352,118 @@ public struct SettingsView: View {
     private var todaySection: some View {
         SettingsCard(title: Strings.SettingsLabels.today) {
             HStack(spacing: 24) {
-                StatTile(label: Strings.SettingsLabels.breaks, value: state.stats.breaksTaken)
-                StatTile(label: Strings.SettingsLabels.waters, value: state.stats.watersLogged)
-                StatTile(
-                    label: Strings.SettingsLabels.focusMinutes,
-                    value: state.stats.focusMinutes,
-                    unit: Strings.SettingsLabels.minuteUnit
-                )
-                StatTile(label: Strings.SettingsLabels.warnings, value: state.stats.focusWarnings)
+                ForEach(visibleMetrics, id: \.self) { metric in
+                    StatTile(
+                        label: metric.label,
+                        value: metric.value(in: state.stats),
+                        unit: metric.unit
+                    )
+                }
             }
 
-            Button(Strings.SettingsLabels.resetToday) {
-                state.resetTodayStats()
+            HStack(spacing: 12) {
+                Button(Strings.SettingsLabels.resetToday) {
+                    state.resetTodayStats()
+                }
+                Spacer()
+                Button {
+                    metricPickerOpen.toggle()
+                } label: {
+                    Label(Strings.SettingsLabels.customizeStats, systemImage: "slider.horizontal.3")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(SettingsStyle.accent)
+                .help(Strings.SettingsLabels.customizeStats)
+            }
+
+            if metricPickerOpen {
+                statMetricPicker
             }
 
             if !recentHistory.isEmpty {
                 Divider()
-                Text(Strings.SettingsLabels.history)
-                    .font(.subheadline.weight(.semibold))
+
+                HStack(spacing: 6) {
+                    Text(Strings.SettingsLabels.history)
+                        .font(.subheadline.weight(.semibold))
+                    Button {
+                        historyLegendOpen.toggle()
+                    } label: {
+                        Image(systemName: "info.circle")
+                            .imageScale(.medium)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(SettingsStyle.accent)
+                    .help(Strings.SettingsLabels.historyLegendTitle)
+                    .accessibilityLabel(Strings.SettingsLabels.historyLegendTitle)
+                }
+
+                if historyLegendOpen {
+                    HistoryLegend(metrics: visibleMetrics)
+                }
+
+                // 7-day totals so the per-day rows are self-explanatory.
+                HStack(spacing: 16) {
+                    Text(Strings.SettingsLabels.historyLast7Days)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    HistoryMetricRow(totals: weeklyTotals, metrics: visibleMetrics)
+                }
+
                 ForEach(recentHistory, id: \.date) { day in
                     HStack {
                         Text(day.date)
                             .font(.caption.monospaced())
                         Spacer()
-                        Text(
-                            "\(day.breaksTaken) · \(day.watersLogged) · "
-                                + "\(day.focusMinutes)\(Strings.SettingsLabels.minuteUnit) · "
-                                + "\(day.focusWarnings)"
-                        )
-                        .font(.caption)
+                        HistoryMetricRow(totals: StatsTotals(
+                            breaksTaken: day.breaksTaken,
+                            watersLogged: day.watersLogged,
+                            focusMinutes: day.focusMinutes,
+                            focusWarnings: day.focusWarnings
+                        ), metrics: visibleMetrics)
                         .foregroundStyle(.secondary)
                     }
                 }
             }
         }
+    }
+
+    /// The metrics the user has chosen to display, in canonical order. When the
+    /// user hides all four, fall back to showing all so the card is never empty.
+    private var visibleMetrics: [HistoryMetric] {
+        let shown = HistoryMetric.allCases.filter { $0.isVisible(in: state.settings) }
+        return shown.isEmpty ? HistoryMetric.allCases : shown
+    }
+
+    /// Checkboxes to toggle which stat metrics appear in the tiles, summary,
+    /// history rows, and legend.
+    private var statMetricPicker: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(HistoryMetric.allCases, id: \.self) { metric in
+                Toggle(isOn: metricBinding(metric)) {
+                    HStack(spacing: 6) {
+                        Image(systemName: metric.symbol).imageScale(.small)
+                        Text(metric.label)
+                    }
+                    .font(.caption)
+                }
+                .toggleStyle(.checkbox)
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 8).fill(SettingsStyle.background)
+        )
+    }
+
+    private func metricBinding(_ metric: HistoryMetric) -> Binding<Bool> {
+        Binding(
+            get: { metric.isVisible(in: state.settings) },
+            set: { next in state.updateSettings { metric.setVisible(next, in: &$0) } }
+        )
     }
 
     /// Most recent days first, excluding today (shown above).
@@ -393,6 +473,12 @@ public struct SettingsView: View {
             .sorted { $0.date > $1.date }
             .prefix(7)
             .map { $0 }
+    }
+
+    /// Totals across the days shown in `recentHistory` (excludes today, to match
+    /// the list below the summary).
+    private var weeklyTotals: StatsTotals {
+        StatsTotals.summing(recentHistory)
     }
 
     // MARK: About
@@ -564,6 +650,129 @@ struct StatTile: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+    }
+}
+
+/// Compact icon+value chips for a history row (or the weekly summary). Icons
+/// mirror the labeled Today tiles so the numbers are unambiguous; each chip has
+/// a help tooltip naming the metric. Only `metrics` are shown.
+struct HistoryMetricRow: View {
+    let totals: StatsTotals
+    let metrics: [HistoryMetric]
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ForEach(metrics, id: \.self) { metric in
+                chip(metric, metric.formatted(totals))
+            }
+        }
+        .font(.caption)
+    }
+
+    private func chip(_ metric: HistoryMetric, _ value: String) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: metric.symbol)
+                .imageScale(.small)
+            Text(value)
+        }
+        .accessibilityLabel("\(metric.label): \(value)")
+        .help("\(metric.label): \(value)")
+    }
+}
+
+/// The four history metrics and their SF Symbols, kept in one place so the
+/// per-day rows, the weekly summary, the info-button legend, and the visibility
+/// checkboxes never drift.
+enum HistoryMetric: CaseIterable {
+    case breaks, waters, focus, distractions
+
+    var symbol: String {
+        switch self {
+        case .breaks: return "figure.walk"
+        case .waters: return "drop.fill"
+        case .focus: return "timer"
+        case .distractions: return "exclamationmark.triangle"
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .breaks: return Strings.SettingsLabels.breaks
+        case .waters: return Strings.SettingsLabels.waters
+        case .focus: return Strings.SettingsLabels.focusMinutes
+        case .distractions: return Strings.SettingsLabels.warnings
+        }
+    }
+
+    /// Unit suffix for a single value (only Focus is measured in minutes).
+    var unit: String {
+        self == .focus ? Strings.SettingsLabels.minuteUnit : ""
+    }
+
+    /// This metric's counter for one day.
+    func value(in day: DayStats) -> Int {
+        switch self {
+        case .breaks: return day.breaksTaken
+        case .waters: return day.watersLogged
+        case .focus: return day.focusMinutes
+        case .distractions: return day.focusWarnings
+        }
+    }
+
+    /// This metric's value from aggregated totals, formatted with its unit.
+    func formatted(_ totals: StatsTotals) -> String {
+        let n: Int
+        switch self {
+        case .breaks: n = totals.breaksTaken
+        case .waters: n = totals.watersLogged
+        case .focus: n = totals.focusMinutes
+        case .distractions: n = totals.focusWarnings
+        }
+        return "\(n)\(unit)"
+    }
+
+    func isVisible(in settings: Settings) -> Bool {
+        switch self {
+        case .breaks: return settings.showBreaksStat
+        case .waters: return settings.showWatersStat
+        case .focus: return settings.showFocusStat
+        case .distractions: return settings.showDistractionsStat
+        }
+    }
+
+    func setVisible(_ value: Bool, in settings: inout Settings) {
+        switch self {
+        case .breaks: settings.showBreaksStat = value
+        case .waters: settings.showWatersStat = value
+        case .focus: settings.showFocusStat = value
+        case .distractions: settings.showDistractionsStat = value
+        }
+    }
+}
+
+/// Legend revealed by the History info button: each icon next to its meaning,
+/// laid out in a single row. Only shows the currently visible `metrics`.
+struct HistoryLegend: View {
+    let metrics: [HistoryMetric]
+
+    var body: some View {
+        HStack(spacing: 14) {
+            ForEach(metrics, id: \.self) { metric in
+                HStack(spacing: 5) {
+                    Image(systemName: metric.symbol)
+                        .imageScale(.small)
+                    Text(metric.label)
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(SettingsStyle.background)
+        )
     }
 }
 

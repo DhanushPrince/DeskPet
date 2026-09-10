@@ -27,10 +27,25 @@ struct StatsStoreTests {
         let stats = DayStats(date: "2026-08-28", breaksTaken: 1)
         #expect(StatsStore.isSame(stats, stats))
         #expect(!StatsStore.isSame(nil, stats))
-
         var other = stats
         other.watersLogged = 1
         #expect(!StatsStore.isSame(other, stats))
+    }
+
+    @Test("StatsTotals.summing adds every counter across days")
+    func statsTotalsSumming() {
+        let days = [
+            DayStats(date: "2026-09-01", breaksTaken: 1, watersLogged: 3, focusMinutes: 1, focusWarnings: 0),
+            DayStats(date: "2026-09-02", breaksTaken: 0, watersLogged: 4, focusMinutes: 10, focusWarnings: 5),
+            DayStats(date: "2026-09-03", breaksTaken: 1, watersLogged: 4, focusMinutes: 0, focusWarnings: 0)
+        ]
+        let totals = StatsTotals.summing(days)
+        #expect(totals == StatsTotals(breaksTaken: 2, watersLogged: 11, focusMinutes: 11, focusWarnings: 5))
+    }
+
+    @Test("StatsTotals.summing of no days is all zero")
+    func statsTotalsEmpty() {
+        #expect(StatsTotals.summing([DayStats]()) == StatsTotals())
     }
 
     @Test("the first read creates today's entry")
