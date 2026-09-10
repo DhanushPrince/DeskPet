@@ -1101,20 +1101,17 @@ public final class AppState {
     public var menuState: MenuState {
         let target = settings.hydrationTargetMilliliters
         var summary: String?
-        var addLabel: String?
         if target > 0, settings.hydrationReminderEnabled {
             let progress = HydrationProgress(
                 consumedMilliliters: stats.waterMilliliters,
                 targetMilliliters: target
             )
             summary = "💧 \(progress.summaryString)"
-            addLabel = "\(Strings.SettingsLabels.addServing)\(settings.hydrationServingMilliliters) \(Strings.SettingsLabels.milliliterUnit)"
         }
         return MenuState(
             petVisible: petVisible,
             focusActive: focusActive,
-            hydrationSummary: summary,
-            hydrationAddLabel: addLabel
+            hydrationSummary: summary
         )
     }
 
@@ -1126,7 +1123,6 @@ public final class AppState {
         case .stopFocusCompleted: stopFocus(completed: true)
         case .stopFocusCancelled: stopFocus(completed: false)
         case .openSettings: onOpenSettings?()
-        case .logServing: logHydrationServing()
         case .quit:
             // Status-item menus run in the tracking run loop; `terminate:` from
             // that turn is ignored. Fire after the menu has dismissed.

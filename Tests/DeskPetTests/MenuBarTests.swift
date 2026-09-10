@@ -167,16 +167,14 @@ struct MenuBuilderTests {
 
     // MARK: Hydration
 
-    @Test("the tray menu shows a hydration summary and quick-add when a target is set")
+    @Test("the tray menu shows a hydration summary when a target is set")
     func hydrationItemsPresent() {
         let s = MenuState(
             petVisible: true,
             focusActive: false,
-            hydrationSummary: "💧 1.25 L / 2 L",
-            hydrationAddLabel: "+250 ml"
+            hydrationSummary: "💧 1.25 L / 2 L"
         )
         let items = MenuBuilder.trayMenu(s)
-        #expect(commands(items).contains(.logServing))
         let labels = items.compactMap { item -> String? in
             if case .disabledLabel(let title) = item { return title }
             return nil
@@ -184,10 +182,14 @@ struct MenuBuilderTests {
         #expect(labels.contains("💧 1.25 L / 2 L"))
     }
 
-    @Test("the tray menu omits hydration items when no target is set")
+    @Test("the tray menu omits the hydration summary when no target is set")
     func hydrationItemsAbsent() {
         let items = MenuBuilder.trayMenu(state())
-        #expect(!commands(items).contains(.logServing))
+        let labels = items.compactMap { item -> String? in
+            if case .disabledLabel(let title) = item { return title }
+            return nil
+        }
+        #expect(!labels.contains { $0.hasPrefix("💧") })
     }
 }
 
@@ -438,12 +440,6 @@ struct AppStateTests {
         state.onOpenSettings = { settingsOpened += 1 }
         state.handle(.openSettings)
         #expect(settingsOpened == 1)
-
-        // Quick-add logs a serving without opening anything.
-        state.updateSettings { $0.hydrationServingMilliliters = 250 }
-        let before = state.stats.waterMilliliters
-        state.handle(.logServing)
-        #expect(state.stats.waterMilliliters == before + 250)
     }
 
     @Test("the menu state carries a hydration summary when a target is set")
@@ -459,7 +455,6 @@ struct AppStateTests {
             $0.hydrationServingMilliliters = 250
         }
         #expect(state.menuState.hydrationSummary != nil)
-        #expect(state.menuState.hydrationAddLabel == "+250 ml")
 
         // No target -> no hydration menu items.
         state.updateSettings { $0.hydrationTargetMilliliters = 0 }
