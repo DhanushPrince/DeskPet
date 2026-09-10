@@ -21,6 +21,12 @@ struct SettingsNormalizationTests {
         #expect(defaults.breakRunDurationSeconds == 60)
         #expect(defaults.hydrationReminderEnabled)
         #expect(defaults.hydrationIntervalMinutes == 90)
+        #expect(defaults.hydrationServingMilliliters == 250)
+        #expect(defaults.hydrationTargetMilliliters == 2000)
+        #expect(defaults.hydrationActiveStartMinutes == 8 * 60)
+        #expect(defaults.hydrationActiveEndMinutes == 22 * 60)
+        #expect(defaults.hydrationReminderStrategy == .smartPacing)
+        #expect(defaults.hydrationStopAtGoal)
         #expect(defaults.focusDurationMinutes == 25)
         #expect(!defaults.distractionDetectionEnabled)
         #expect(defaults.hidePetDuringMeetings)
@@ -44,6 +50,41 @@ struct SettingsNormalizationTests {
         let json = #"{"petAppearanceId":"cat"}"#
         let decoded = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
         #expect(decoded.petAppearanceID == Settings.defaults.petAppearanceID)
+    }
+
+    @Test("older payloads without hydration volume/pacing keys use defaults")
+    func missingHydrationKeysDefault() throws {
+        let json = #"{"petAppearanceId":"lineDog","hydrationReminderEnabled":true}"#
+        let decoded = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
+        #expect(decoded.hydrationServingMilliliters == 250)
+        #expect(decoded.hydrationTargetMilliliters == 2000)
+        #expect(decoded.hydrationActiveStartMinutes == 480)
+        #expect(decoded.hydrationActiveEndMinutes == 1320)
+        #expect(decoded.hydrationReminderStrategy == .smartPacing)
+        #expect(decoded.hydrationStopAtGoal)
+    }
+
+    @Test("stored hydration volume/pacing values are preserved")
+    func hydrationValuesPreserved() throws {
+        let json = """
+        {"hydrationServingMilliliters":330,"hydrationTargetMilliliters":3000,
+         "hydrationActiveStartMinutes":420,"hydrationActiveEndMinutes":1380,
+         "hydrationReminderStrategy":"fixedInterval","hydrationStopAtGoal":false}
+        """
+        let decoded = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
+        #expect(decoded.hydrationServingMilliliters == 330)
+        #expect(decoded.hydrationTargetMilliliters == 3000)
+        #expect(decoded.hydrationActiveStartMinutes == 420)
+        #expect(decoded.hydrationActiveEndMinutes == 1380)
+        #expect(decoded.hydrationReminderStrategy == .fixedInterval)
+        #expect(!decoded.hydrationStopAtGoal)
+    }
+
+    @Test("an unknown hydration strategy collapses to the default")
+    func unknownStrategyDefaults() throws {
+        let json = #"{"hydrationReminderStrategy":"telepathy"}"#
+        let decoded = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
+        #expect(decoded.hydrationReminderStrategy == .smartPacing)
     }
 
     @Test("older payloads without stat-visibility keys default to all visible")

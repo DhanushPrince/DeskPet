@@ -178,6 +178,11 @@ public final class AppState {
         scheduler.onMidnight = { [weak self] in
             self?.handleMidnight()
         }
+        // Smart pacing needs today's consumed volume; read it lazily from stats
+        // so the scheduler stays free of storage.
+        scheduler.hydrationConsumedProvider = { [weak self] in
+            self?.stats.waterMilliliters ?? 0
+        }
         displayWatcher.onChange = { [weak self] in
             ScreenBridge.invalidateDisplayCache()
             self?.petWindow.clampIntoVisibleArea()
@@ -312,9 +317,11 @@ public final class AppState {
     }
 
     /// Ported from the `hydration:done` action: drink, celebrate, then settle.
+    /// Now also logs the configured serving volume and, when a daily target is
+    /// set, acknowledges milestones and celebrates the goal (option c: the pet's
+    /// happy animation + a calm bubble + silence for the rest of the day).
     private func completeHydrationPrompt() {
-        statsStore.update { $0.watersLogged += 1 }
-        stats = statsStore.current()
+        let crossing = recordServing()
 
         stateMachine.beginDrinking()
         hideBubble()
@@ -322,21 +329,73 @@ public final class AppState {
 
         after(Constants.drinkingDuration) { [weak self] in
             guard let self, self.stateMachine.finishDrinking() else { return }
+
+            let message: String
+            if crossing.reachedGoal {
+                message = Strings.pick(Strings.Bubble.hydrationGoal)
+            } else if let milestone = crossing.milestone {
+                message = Strings.Bubble.hydrationMilestone(milestone)
+            } else {
+                message = Strings.pick(Strings.Bubble.hydrationDone)
+            }
+
             self.showBubble(SpeechBubble(
-                id: BubbleID.hydrationComplete,
-                message: Strings.pick(Strings.Bubble.hydrationDone),
+                id: crossing.reachedGoal ? BubbleID.hydrationGoal : BubbleID.hydrationComplete,
+                message: message,
                 autoDismissAfter: Constants.hydrationDoneBubbleDuration
             ))
 
             self.after(Constants.hydrationDoneReturnDelay) { [weak self] in
                 guard let self else { return }
-                // The next reminder is measured from the end of this one.
+                // Reschedule from the end of this drink. When the goal is reached
+                // (and stop-at-goal is on) the paced date is nil, so hydration
+                // goes quiet for the rest of the day automatically.
                 self.scheduler.scheduleHydration()
                 if self.showOverdueReminder() { return }
                 self.hideBubble()
                 self.stateMachine.settleAfterTransientState()
             }
         }
+    }
+
+    /// Outcome of logging one serving, used to pick the celebration copy.
+    private struct HydrationCrossing {
+        var milestone: Int?
+        var reachedGoal: Bool
+    }
+
+    /// Adds one configured serving to today's volume + count and reports which
+    /// milestone (if any) was just crossed and whether the goal was reached.
+    /// Shared by the "I drank" bubble action and the quick-add buttons.
+    @discardableResult
+    private func recordServing() -> HydrationCrossing {
+        let serving = settings.hydrationServingMilliliters
+        let target = settings.hydrationTargetMilliliters
+        let previous = stats.waterMilliliters
+
+        statsStore.update {
+            $0.watersLogged += 1
+            $0.waterMilliliters += serving
+        }
+        stats = statsStore.current()
+
+        let milestone = HydrationProgress.milestoneJustCrossed(
+            previousMilliliters: previous,
+            newMilliliters: stats.waterMilliliters,
+            targetMilliliters: target
+        )
+        // Goal is a 100% crossing; drinking further past it won't re-fire because
+        // the crossing predicate only reports the transition increment.
+        let reachedGoal = milestone == 100
+        return HydrationCrossing(milestone: milestone == 100 ? nil : milestone, reachedGoal: reachedGoal)
+    }
+
+    /// Logs one serving without a reminder prompt — used by the Today card and
+    /// menu-bar quick-add. Runs the same drink/celebrate sequence as the prompt
+    /// action so milestones and the goal celebration still fire.
+    public func logHydrationServing() {
+        guard isRunning else { return }
+        completeHydrationPrompt()
     }
 
     /// Ported from the `hydration:snooze` action.
@@ -981,7 +1040,23 @@ public final class AppState {
     // MARK: - Menu
 
     public var menuState: MenuState {
-        MenuState(petVisible: petVisible, focusActive: focusActive)
+        let target = settings.hydrationTargetMilliliters
+        var summary: String?
+        var addLabel: String?
+        if target > 0, settings.hydrationReminderEnabled {
+            let progress = HydrationProgress(
+                consumedMilliliters: stats.waterMilliliters,
+                targetMilliliters: target
+            )
+            summary = "💧 \(progress.summaryString)"
+            addLabel = "\(Strings.SettingsLabels.addServing)\(settings.hydrationServingMilliliters) \(Strings.SettingsLabels.milliliterUnit)"
+        }
+        return MenuState(
+            petVisible: petVisible,
+            focusActive: focusActive,
+            hydrationSummary: summary,
+            hydrationAddLabel: addLabel
+        )
     }
 
     public func handle(_ action: MenuAction) {
@@ -992,6 +1067,7 @@ public final class AppState {
         case .stopFocusCompleted: stopFocus(completed: true)
         case .stopFocusCancelled: stopFocus(completed: false)
         case .openSettings: onOpenSettings?()
+        case .logServing: logHydrationServing()
         case .quit:
             // Status-item menus run in the tracking run loop; `terminate:` from
             // that turn is ignored. Fire after the menu has dismissed.

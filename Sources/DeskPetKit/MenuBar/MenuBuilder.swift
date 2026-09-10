@@ -14,6 +14,9 @@ public enum MenuAction: String, CaseIterable, Sendable {
     case openSettings
     case quit
 
+    /// Log one serving of water from the menu bar without opening anything.
+    case logServing
+
     case demoBreak
     case demoHydration
     case demoFocusWarning
@@ -34,6 +37,11 @@ public struct MenuState: Equatable, Sendable {
     public var appName: String
     public var petVisible: Bool
     public var focusActive: Bool
+    /// A hydration progress summary like "💧 1.25 / 2 L", or nil when no target
+    /// is set (so the menu shows nothing hydration-related).
+    public var hydrationSummary: String?
+    /// The quick-add serving label, e.g. "+250 ml". Shown only with a target.
+    public var hydrationAddLabel: String?
     /// Demo triggers were dev-only in the Electron build (gated on
     /// `!app.isPackaged`); here they appear only in debug builds.
     public var includeDeveloperItems: Bool
@@ -42,11 +50,15 @@ public struct MenuState: Equatable, Sendable {
         appName: String = Constants.appName,
         petVisible: Bool,
         focusActive: Bool,
+        hydrationSummary: String? = nil,
+        hydrationAddLabel: String? = nil,
         includeDeveloperItems: Bool = MenuState.developerItemsDefault
     ) {
         self.appName = appName
         self.petVisible = petVisible
         self.focusActive = focusActive
+        self.hydrationSummary = hydrationSummary
+        self.hydrationAddLabel = hydrationAddLabel
         self.includeDeveloperItems = includeDeveloperItems
     }
 
@@ -96,8 +108,20 @@ public enum MenuBuilder {
         return items
     }
 
+    /// Hydration progress label + quick-add, shown only when a target is set.
+    static func hydrationItems(_ state: MenuState) -> [MenuItemDescriptor] {
+        guard let summary = state.hydrationSummary else { return [] }
+        var items: [MenuItemDescriptor] = [.disabledLabel(summary)]
+        if let addLabel = state.hydrationAddLabel {
+            items.append(.command(.logServing, title: addLabel))
+        }
+        items.append(.separator)
+        return items
+    }
+
     public static func trayMenu(_ state: MenuState) -> [MenuItemDescriptor] {
         [.disabledLabel(state.appName), .separator]
+            + hydrationItems(state)
             + actionItems(state)
             + [.separator, .command(.quit, title: Strings.Menu.quit)]
     }

@@ -551,6 +551,10 @@ struct BreakFlowTests {
         defer { cleanup() }
         state.start()
 
+        // Fixed interval so the 90-minute expectation holds regardless of the
+        // smart-pacing active window.
+        state.updateSettings { $0.hydrationReminderStrategy = .fixedInterval }
+
         state.handle(.demoBreak)
         state.petWindow.contentView.bubbleView.onAction(BubbleActionID.breakMute)
         #expect(state.stateMachine.breakMutedToday)

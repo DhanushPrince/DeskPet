@@ -26,6 +26,7 @@ public struct SettingsView: View {
     @State private var customEditorOpen = false
     @State private var historyLegendOpen = false
     @State private var metricPickerOpen = false
+    @State private var hydrationInfoOpen = false
 
     public init(state: AppState) {
         self.state = state
@@ -166,10 +167,27 @@ public struct SettingsView: View {
 
             Divider()
 
-            Toggle(Strings.SettingsLabels.enableHydrationReminder, isOn: boolBinding(
-                get: { $0.hydrationReminderEnabled },
-                set: { $0.hydrationReminderEnabled = $1 }
-            ))
+            HStack(spacing: 6) {
+                Toggle(Strings.SettingsLabels.enableHydrationReminder, isOn: boolBinding(
+                    get: { $0.hydrationReminderEnabled },
+                    set: { $0.hydrationReminderEnabled = $1 }
+                ))
+                Button {
+                    hydrationInfoOpen.toggle()
+                } label: {
+                    Image(systemName: "info.circle")
+                        .imageScale(.medium)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(SettingsStyle.accent)
+                .help(Strings.SettingsLabels.hydrationInfoTitle)
+                .accessibilityLabel(Strings.SettingsLabels.hydrationInfoTitle)
+                Spacer()
+            }
+
+            if hydrationInfoOpen {
+                hydrationInfo
+            }
 
             NumberRow(
                 label: Strings.SettingsLabels.hydrationInterval,
@@ -181,7 +199,98 @@ public struct SettingsView: View {
                     range: SettingsLimits.hydrationIntervalMinutes
                 )
             )
-            .disabled(!state.settings.hydrationReminderEnabled)
+            .disabled(
+                !state.settings.hydrationReminderEnabled
+                    || state.settings.hydrationReminderStrategy != .fixedInterval
+            )
+
+            hydrationVolumeControls
+        }
+    }
+
+    /// Explains how the hydration reminder times itself, revealed by the info
+    /// button on the reminder toggle.
+    private var hydrationInfo: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(Strings.SettingsLabels.hydrationInfoSmart)
+            Text(Strings.SettingsLabels.hydrationInfoFixed)
+            Text(Strings.SettingsLabels.hydrationInfoGoal)
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 8).fill(SettingsStyle.background)
+        )
+    }
+
+    /// Volume target, serving, pacing strategy, active hours, and stop-at-goal.
+    @ViewBuilder
+    private var hydrationVolumeControls: some View {
+        NumberRow(
+            label: Strings.SettingsLabels.hydrationTarget,
+            unit: Strings.SettingsLabels.milliliterUnit,
+            range: SettingsLimits.hydrationTargetMilliliters,
+            value: intBinding(
+                get: { $0.hydrationTargetMilliliters },
+                set: { $0.hydrationTargetMilliliters = $1 },
+                range: SettingsLimits.hydrationTargetMilliliters
+            )
+        )
+        Text(Strings.SettingsLabels.hydrationTargetHint)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+        NumberRow(
+            label: Strings.SettingsLabels.hydrationServing,
+            unit: Strings.SettingsLabels.milliliterUnit,
+            range: SettingsLimits.hydrationServingMilliliters,
+            value: intBinding(
+                get: { $0.hydrationServingMilliliters },
+                set: { $0.hydrationServingMilliliters = $1 },
+                range: SettingsLimits.hydrationServingMilliliters
+            )
+        )
+
+        Picker(Strings.SettingsLabels.hydrationStrategy, selection: strategyBinding) {
+            Text(Strings.SettingsLabels.hydrationStrategySmart).tag(HydrationReminderStrategy.smartPacing)
+            Text(Strings.SettingsLabels.hydrationStrategyFixed).tag(HydrationReminderStrategy.fixedInterval)
+        }
+        .pickerStyle(.radioGroup)
+
+        // Active hours only matter for smart pacing.
+        if state.settings.hydrationReminderStrategy == .smartPacing {
+            HStack {
+                Text(Strings.SettingsLabels.hydrationActiveHours)
+                Spacer()
+                DatePicker(
+                    Strings.SettingsLabels.hydrationActiveStart,
+                    selection: timeBinding(
+                        get: { $0.hydrationActiveStartMinutes },
+                        set: { $0.hydrationActiveStartMinutes = $1 }
+                    ),
+                    displayedComponents: .hourAndMinute
+                )
+                .labelsHidden()
+                Text(Strings.SettingsLabels.hydrationActiveEnd)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                DatePicker(
+                    Strings.SettingsLabels.hydrationActiveEnd,
+                    selection: timeBinding(
+                        get: { $0.hydrationActiveEndMinutes },
+                        set: { $0.hydrationActiveEndMinutes = $1 }
+                    ),
+                    displayedComponents: .hourAndMinute
+                )
+                .labelsHidden()
+            }
+
+            Toggle(Strings.SettingsLabels.hydrationStopAtGoal, isOn: boolBinding(
+                get: { $0.hydrationStopAtGoal },
+                set: { $0.hydrationStopAtGoal = $1 }
+            ))
         }
     }
 
@@ -361,6 +470,8 @@ public struct SettingsView: View {
                 }
             }
 
+            hydrationProgressRow
+
             HStack(spacing: 12) {
                 Button(Strings.SettingsLabels.resetToday) {
                     state.resetTodayStats()
@@ -426,6 +537,36 @@ public struct SettingsView: View {
                         .foregroundStyle(.secondary)
                     }
                 }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var hydrationProgressRow: some View {
+        let progress = HydrationProgress(
+            consumedMilliliters: state.stats.waterMilliliters,
+            targetMilliliters: state.settings.hydrationTargetMilliliters
+        )
+        // Only when a target is set and the Waters metric is visible.
+        if progress.hasTarget, HistoryMetric.waters.isVisible(in: state.settings) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Label(Strings.SettingsLabels.hydrationProgress, systemImage: "drop.fill")
+                        .font(.caption.weight(.semibold))
+                    Spacer()
+                    Text(progress.summaryString)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button {
+                        state.logHydrationServing()
+                    } label: {
+                        Text("\(Strings.SettingsLabels.addServing)\(state.settings.hydrationServingMilliliters) \(Strings.SettingsLabels.milliliterUnit)")
+                            .font(.caption)
+                    }
+                    .help(Strings.SettingsLabels.hydrationProgress)
+                }
+                ProgressView(value: progress.fraction)
+                    .tint(SettingsStyle.accent)
             }
         }
     }
@@ -529,6 +670,35 @@ public struct SettingsView: View {
         Binding(
             get: { get(state.settings) },
             set: { next in state.updateSettings { set(&$0, next) } }
+        )
+    }
+
+    private var strategyBinding: Binding<HydrationReminderStrategy> {
+        Binding(
+            get: { state.settings.hydrationReminderStrategy },
+            set: { next in state.updateSettings { $0.hydrationReminderStrategy = next } }
+        )
+    }
+
+    /// Bridges a minutes-since-midnight setting to a `DatePicker`'s `Date`,
+    /// using today's date for the calendar component only (time is what matters).
+    private func timeBinding(
+        get: @escaping (Settings) -> Int,
+        set: @escaping (inout Settings, Int) -> Void
+    ) -> Binding<Date> {
+        Binding(
+            get: {
+                let minutes = SettingsLimits.clamp(
+                    get(state.settings), to: SettingsLimits.hydrationActiveStartMinutes
+                )
+                let midnight = Calendar.current.startOfDay(for: Date())
+                return midnight.addingTimeInterval(TimeInterval(minutes) * 60)
+            },
+            set: { date in
+                let comps = Calendar.current.dateComponents([.hour, .minute], from: date)
+                let minutes = (comps.hour ?? 0) * 60 + (comps.minute ?? 0)
+                state.updateSettings { set(&$0, minutes) }
+            }
         )
     }
 }
@@ -663,20 +833,25 @@ struct HistoryMetricRow: View {
     var body: some View {
         HStack(spacing: 12) {
             ForEach(metrics, id: \.self) { metric in
-                chip(metric, metric.formatted(totals))
+                chip(metric)
             }
         }
         .font(.caption)
     }
 
-    private func chip(_ metric: HistoryMetric, _ value: String) -> some View {
-        HStack(spacing: 3) {
+    private func chip(_ metric: HistoryMetric) -> some View {
+        let value = metric.formatted(totals)
+        let count = metric.countString(totals)
+        // For waters the chip shows litres, so surface the glass count in the
+        // tooltip; for the others count == value.
+        let help = value == count ? "\(metric.label): \(value)" : "\(metric.label): \(value) (\(count))"
+        return HStack(spacing: 3) {
             Image(systemName: metric.symbol)
                 .imageScale(.small)
             Text(value)
         }
-        .accessibilityLabel("\(metric.label): \(value)")
-        .help("\(metric.label): \(value)")
+        .accessibilityLabel(help)
+        .help(help)
     }
 }
 
@@ -720,15 +895,24 @@ enum HistoryMetric: CaseIterable {
     }
 
     /// This metric's value from aggregated totals, formatted with its unit.
+    /// Waters is shown as volume (litres); the raw count stays available via
+    /// `countString` for tooltips/accessibility.
     func formatted(_ totals: StatsTotals) -> String {
-        let n: Int
         switch self {
-        case .breaks: n = totals.breaksTaken
-        case .waters: n = totals.watersLogged
-        case .focus: n = totals.focusMinutes
-        case .distractions: n = totals.focusWarnings
+        case .breaks: return "\(totals.breaksTaken)"
+        case .waters: return HydrationMath.litersString(totals.waterMilliliters)
+        case .focus: return "\(totals.focusMinutes)\(unit)"
+        case .distractions: return "\(totals.focusWarnings)"
         }
-        return "\(n)\(unit)"
+    }
+
+    /// The raw count, used in the chip tooltip so the underlying glasses stay
+    /// visible even when the chip shows litres.
+    func countString(_ totals: StatsTotals) -> String {
+        switch self {
+        case .waters: return "\(totals.watersLogged)"
+        default: return formatted(totals)
+        }
     }
 
     func isVisible(in settings: Settings) -> Bool {

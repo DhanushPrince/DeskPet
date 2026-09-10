@@ -60,7 +60,11 @@ public enum Constants {
     public static let distractionWarningCooldown: TimeInterval = 60
 
     public static let breakSnooze: TimeInterval = 10 * 60
-    public static let hydrationSnooze: TimeInterval = 15 * 60
+    public static let hydrationSnooze: TimeInterval = 20 * 60
+
+    /// Smart-pacing bounds on the gap between hydration reminders.
+    public static let hydrationMinGapMinutes = 45
+    public static let hydrationMaxGapMinutes = 180
 
     /// Safety net that ends a drag if the mouse-up event is never seen.
     public static let dragSafetyTimeout: TimeInterval = 15

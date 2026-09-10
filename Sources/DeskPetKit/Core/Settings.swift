@@ -1,5 +1,15 @@
 import Foundation
 
+/// How hydration reminders are timed.
+public enum HydrationReminderStrategy: String, Equatable, Codable, Sendable, CaseIterable {
+    /// Spread the day's remaining servings across the active window, rescheduling
+    /// after each drink and stopping at the goal.
+    case smartPacing
+    /// A blind fixed interval (`hydrationIntervalMinutes`), the original
+    /// behaviour.
+    case fixedInterval
+}
+
 /// User preferences. Field names match the persisted JSON keys used by the
 /// Electron build so migrated data decodes without a translation layer.
 public struct Settings: Equatable, Codable, Sendable {
@@ -13,6 +23,12 @@ public struct Settings: Equatable, Codable, Sendable {
     public var breakRunDurationSeconds: Int
     public var hydrationReminderEnabled: Bool
     public var hydrationIntervalMinutes: Int
+    public var hydrationServingMilliliters: Int
+    public var hydrationTargetMilliliters: Int
+    public var hydrationActiveStartMinutes: Int
+    public var hydrationActiveEndMinutes: Int
+    public var hydrationReminderStrategy: HydrationReminderStrategy
+    public var hydrationStopAtGoal: Bool
     public var focusDurationMinutes: Int
     public var distractionDetectionEnabled: Bool
     public var distractionGraceSeconds: Int
@@ -38,6 +54,12 @@ public struct Settings: Equatable, Codable, Sendable {
         case breakRunDurationSeconds
         case hydrationReminderEnabled
         case hydrationIntervalMinutes
+        case hydrationServingMilliliters
+        case hydrationTargetMilliliters
+        case hydrationActiveStartMinutes
+        case hydrationActiveEndMinutes
+        case hydrationReminderStrategy
+        case hydrationStopAtGoal
         case focusDurationMinutes
         case distractionDetectionEnabled
         case distractionGraceSeconds
@@ -62,6 +84,12 @@ public struct Settings: Equatable, Codable, Sendable {
         breakRunDurationSeconds: 60,
         hydrationReminderEnabled: true,
         hydrationIntervalMinutes: 90,
+        hydrationServingMilliliters: 250,
+        hydrationTargetMilliliters: 2000,
+        hydrationActiveStartMinutes: 8 * 60,
+        hydrationActiveEndMinutes: 22 * 60,
+        hydrationReminderStrategy: .smartPacing,
+        hydrationStopAtGoal: true,
         focusDurationMinutes: 25,
         distractionDetectionEnabled: false,
         distractionGraceSeconds: 8,
@@ -112,6 +140,23 @@ public struct Settings: Equatable, Codable, Sendable {
         hydrationIntervalMinutes = value(
             .hydrationIntervalMinutes, defaults.hydrationIntervalMinutes
         )
+        hydrationServingMilliliters = value(
+            .hydrationServingMilliliters, defaults.hydrationServingMilliliters
+        )
+        hydrationTargetMilliliters = value(
+            .hydrationTargetMilliliters, defaults.hydrationTargetMilliliters
+        )
+        hydrationActiveStartMinutes = value(
+            .hydrationActiveStartMinutes, defaults.hydrationActiveStartMinutes
+        )
+        hydrationActiveEndMinutes = value(
+            .hydrationActiveEndMinutes, defaults.hydrationActiveEndMinutes
+        )
+        // Unknown/legacy strategy strings collapse to the default.
+        hydrationReminderStrategy = value(
+            .hydrationReminderStrategy, defaults.hydrationReminderStrategy
+        )
+        hydrationStopAtGoal = value(.hydrationStopAtGoal, defaults.hydrationStopAtGoal)
         focusDurationMinutes = value(.focusDurationMinutes, defaults.focusDurationMinutes)
         distractionDetectionEnabled = value(
             .distractionDetectionEnabled, defaults.distractionDetectionEnabled
@@ -141,6 +186,12 @@ public struct Settings: Equatable, Codable, Sendable {
         breakRunDurationSeconds: Int,
         hydrationReminderEnabled: Bool,
         hydrationIntervalMinutes: Int,
+        hydrationServingMilliliters: Int = 250,
+        hydrationTargetMilliliters: Int = 2000,
+        hydrationActiveStartMinutes: Int = 8 * 60,
+        hydrationActiveEndMinutes: Int = 22 * 60,
+        hydrationReminderStrategy: HydrationReminderStrategy = .smartPacing,
+        hydrationStopAtGoal: Bool = true,
         focusDurationMinutes: Int,
         distractionDetectionEnabled: Bool,
         distractionGraceSeconds: Int,
@@ -162,6 +213,12 @@ public struct Settings: Equatable, Codable, Sendable {
         self.breakRunDurationSeconds = breakRunDurationSeconds
         self.hydrationReminderEnabled = hydrationReminderEnabled
         self.hydrationIntervalMinutes = hydrationIntervalMinutes
+        self.hydrationServingMilliliters = hydrationServingMilliliters
+        self.hydrationTargetMilliliters = hydrationTargetMilliliters
+        self.hydrationActiveStartMinutes = hydrationActiveStartMinutes
+        self.hydrationActiveEndMinutes = hydrationActiveEndMinutes
+        self.hydrationReminderStrategy = hydrationReminderStrategy
+        self.hydrationStopAtGoal = hydrationStopAtGoal
         self.focusDurationMinutes = focusDurationMinutes
         self.distractionDetectionEnabled = distractionDetectionEnabled
         self.distractionGraceSeconds = distractionGraceSeconds
@@ -186,6 +243,10 @@ public enum SettingsLimits {
     public static let breakIntervalMinutes = 1...900
     public static let breakRunDurationSeconds = 10...900
     public static let hydrationIntervalMinutes = 1...900
+    public static let hydrationServingMilliliters = 50...2000
+    public static let hydrationTargetMilliliters = 0...8000
+    public static let hydrationActiveStartMinutes = 0...1439
+    public static let hydrationActiveEndMinutes = 0...1439
     public static let focusDurationMinutes = 1...900
     public static let distractionGraceSeconds = 0...900
 

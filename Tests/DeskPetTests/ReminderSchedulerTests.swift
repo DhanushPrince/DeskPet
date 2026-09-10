@@ -109,8 +109,12 @@ struct ReminderMathTests {
 struct ReminderSchedulerTests {
 
     /// A scheduler that never arms a real timer, so `tick()` is the only driver.
+    ///
+    /// Defaults to the fixed-interval hydration strategy so the long-standing
+    /// interval-based expectations below stay meaningful; smart pacing has its
+    /// own dedicated tests.
     private func makeScheduler(
-        settings: Settings = .defaults
+        settings: Settings = ReminderSchedulerTests.fixedIntervalDefaults
     ) -> (ReminderScheduler, TestClock, () -> [ReminderKind]) {
         let clock = TestClock()
         let scheduler = ReminderScheduler(settings: settings, clock: clock)
@@ -122,6 +126,12 @@ struct ReminderSchedulerTests {
         // Populate due dates without starting the run-loop timer.
         scheduler.rescheduleAll()
         return (scheduler, clock, { raised })
+    }
+
+    private static var fixedIntervalDefaults: Settings {
+        var s = Settings.defaults
+        s.hydrationReminderStrategy = .fixedInterval
+        return s
     }
 
     @Test("default settings schedule both reminders")
@@ -166,6 +176,7 @@ struct ReminderSchedulerTests {
     @Test("break takes precedence when both come due together")
     func breakWinsWhenSimultaneous() {
         var settings = Settings.defaults
+        settings.hydrationReminderStrategy = .fixedInterval
         settings.breakIntervalMinutes = 10
         settings.hydrationIntervalMinutes = 10
         let (scheduler, clock, raised) = makeScheduler(settings: settings)
@@ -272,12 +283,12 @@ struct ReminderSchedulerTests {
         #expect(due.timeIntervalSince(clock.now) == 10 * 60)
     }
 
-    @Test("snoozing hydration reschedules it 15 minutes out")
+    @Test("snoozing hydration reschedules it 20 minutes out")
     func hydrationSnooze() throws {
         let (scheduler, clock, _) = makeScheduler()
         scheduler.snoozeHydration()
         let due = try #require(scheduler.hydrationDueAt)
-        #expect(due.timeIntervalSince(clock.now) == 15 * 60)
+        #expect(due.timeIntervalSince(clock.now) == 20 * 60)
     }
 
     @Test("a snoozed reminder fires when the snooze elapses")
@@ -424,6 +435,61 @@ struct ReminderSchedulerTests {
         let (scheduler, _, _) = makeScheduler()
         scheduler.clearBreak()
         #expect(scheduler.timeRemaining(for: .breakReminder) == nil)
+    }
+
+    // MARK: Smart pacing
+
+    /// Smart-pacing settings with a clock parked inside the active window
+    /// (12:00 local) so pacing math is exercised deterministically.
+    private func makePacingScheduler(
+        consumed: Int = 0,
+        target: Int = 2000,
+        stopAtGoal: Bool = true
+    ) -> (ReminderScheduler, TestClock) {
+        var settings = Settings.defaults
+        settings.hydrationReminderStrategy = .smartPacing
+        settings.hydrationTargetMilliliters = target
+        settings.hydrationStopAtGoal = stopAtGoal
+
+        var comps = DateComponents()
+        comps.year = 2026; comps.month = 9; comps.day = 10; comps.hour = 12
+        let noon = Calendar.current.date(from: comps)!
+        let clock = TestClock(now: noon)
+
+        let scheduler = ReminderScheduler(settings: settings, clock: clock)
+        scheduler.hydrationConsumedProvider = { consumed }
+        scheduler.onReminderDue = { _ in .accepted }
+        scheduler.rescheduleAll()
+        return (scheduler, clock)
+    }
+
+    @Test("smart pacing schedules a hydration reminder within the gap bounds")
+    func pacingSchedulesWithinBounds() throws {
+        let (scheduler, clock) = makePacingScheduler(consumed: 0)
+        let due = try #require(scheduler.hydrationDueAt)
+        let minutes = due.timeIntervalSince(clock.now) / 60
+        #expect(minutes >= 45 && minutes <= 180)
+    }
+
+    @Test("smart pacing widens the gap after a large drink")
+    func pacingWidensAfterDrink() throws {
+        let (empty, clock1) = makePacingScheduler(consumed: 0)
+        let (full, clock2) = makePacingScheduler(consumed: 1500)
+        let emptyGap = try #require(empty.hydrationDueAt).timeIntervalSince(clock1.now)
+        let fullGap = try #require(full.hydrationDueAt).timeIntervalSince(clock2.now)
+        #expect(fullGap >= emptyGap)
+    }
+
+    @Test("smart pacing stops hydration reminders once the goal is reached")
+    func pacingStopsAtGoal() {
+        let (scheduler, _) = makePacingScheduler(consumed: 2000)
+        #expect(scheduler.hydrationDueAt == nil)
+    }
+
+    @Test("smart pacing keeps reminding past the goal when stop-at-goal is off")
+    func pacingNoStopAtGoal() {
+        let (scheduler, _) = makePacingScheduler(consumed: 2000, stopAtGoal: false)
+        #expect(scheduler.hydrationDueAt != nil)
     }
 }
 

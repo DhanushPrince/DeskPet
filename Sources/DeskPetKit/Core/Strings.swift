@@ -163,6 +163,29 @@ public enum Strings {
 
         public static let minuteUnit = "min"
         public static let secondUnit = "s"
+        public static let milliliterUnit = "ml"
+
+        // Hydration volume + pacing settings.
+        public static let hydrationTarget = "Daily Target"
+        public static let hydrationTargetHint = "0 = no target"
+        public static let hydrationServing = "Serving Size"
+        public static let hydrationActiveHours = "Active Hours"
+        public static let hydrationActiveStart = "From"
+        public static let hydrationActiveEnd = "To"
+        public static let hydrationStrategy = "Reminder Strategy"
+        public static let hydrationStrategySmart = "Smart pacing"
+        public static let hydrationStrategyFixed = "Fixed interval"
+        public static let hydrationStopAtGoal = "Stop reminders when goal reached"
+        public static let hydrationProgress = "Water"
+        public static let addServing = "+"
+        public static let hydrationInfoTitle = "How reminders are timed"
+        public static let hydrationInfoSmart =
+            "Smart pacing spreads your remaining glasses across your active hours "
+            + "(reminders stay 45 min–3 h apart) and reschedules after each drink."
+        public static let hydrationInfoFixed =
+            "Fixed interval simply reminds you every set number of minutes."
+        public static let hydrationInfoGoal =
+            "Either way, reminders stop once you reach the daily target."
 
         /// Display names for each pet state, used by the custom pet editor.
         public static func stateName(_ state: PetState) -> String {
@@ -221,6 +244,24 @@ public enum Strings {
             "All full!",
             "Woof, water's so good"
         ]
+
+        /// Calm, no-guilt goal-reached celebration (option c). No target-missed
+        /// or "drink now" copy anywhere.
+        public static let hydrationGoal = [
+            "Daily goal reached — nicely paced!",
+            "That's your water for today. Great job!",
+            "Goal done! I'll see you tomorrow~"
+        ]
+
+        /// Gentle milestone acknowledgement, keyed by percent (25/50/75).
+        public static func hydrationMilestone(_ percent: Int) -> String {
+            switch percent {
+            case 25: return "First glass done~"
+            case 50: return "Halfway through today's water!"
+            case 75: return "One more short stretch to go~"
+            default: return "Nice progress!"
+            }
+        }
 
         public static let focusComplete = [
             "Focus time's up!",

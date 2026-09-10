@@ -117,6 +117,10 @@ public final class ReminderScheduler {
     /// Raised once per calendar day boundary.
     public var onMidnight: () -> Void = {}
 
+    /// Today's consumed water volume in millilitres, for smart pacing. AppState
+    /// wires this to the stats store; the scheduler never touches stats itself.
+    public var hydrationConsumedProvider: () -> Int = { 0 }
+
     // MARK: State
 
     public private(set) var schedule = ReminderSchedule()
@@ -266,10 +270,13 @@ public final class ReminderScheduler {
     }
 
     private func nextHydrationDueDate() -> Date? {
-        ReminderMath.nextDueDate(
-            from: clock.now,
-            intervalMinutes: settings.hydrationIntervalMinutes,
-            enabled: settings.hydrationReminderEnabled
+        // Smart pacing consults today's consumed volume and the active window;
+        // fixed interval (and a zero target) fall back to the plain interval.
+        HydrationMath.nextHydrationDate(
+            now: clock.now,
+            settings: settings,
+            consumedMilliliters: hydrationConsumedProvider(),
+            calendar: calendar
         )
     }
 

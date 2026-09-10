@@ -70,6 +70,8 @@ public enum BubbleID {
     public static let breakMuted = "break-muted"
     public static let hydrationPrompt = "hydration"
     public static let hydrationComplete = "hydration-complete"
+    public static let hydrationGoal = "hydration-goal"
+    public static let hydrationMilestone = "hydration-milestone"
     public static let focusStart = "focus-start"
     public static let focusWarning = "focus-warning"
     public static let focusComplete = "focus-complete"

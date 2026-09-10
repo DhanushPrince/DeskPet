@@ -8,19 +8,40 @@ public struct DayStats: Equatable, Codable, Sendable {
     public var watersLogged: Int
     public var focusMinutes: Int
     public var focusWarnings: Int
+    /// Total water volume logged for the day, in millilitres. Newer than the
+    /// other counters, so older `stats.json` files omit it (decodes to 0).
+    public var waterMilliliters: Int
 
     public init(
         date: String,
         breaksTaken: Int = 0,
         watersLogged: Int = 0,
         focusMinutes: Int = 0,
-        focusWarnings: Int = 0
+        focusWarnings: Int = 0,
+        waterMilliliters: Int = 0
     ) {
         self.date = date
         self.breaksTaken = breaksTaken
         self.watersLogged = watersLogged
         self.focusMinutes = focusMinutes
         self.focusWarnings = focusWarnings
+        self.waterMilliliters = waterMilliliters
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case date, breaksTaken, watersLogged, focusMinutes, focusWarnings, waterMilliliters
+    }
+
+    /// A payload written before `waterMilliliters` existed lacks that key, so it
+    /// decodes to 0 rather than failing.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        date = try container.decode(String.self, forKey: .date)
+        breaksTaken = (try? container.decode(Int.self, forKey: .breaksTaken)) ?? 0
+        watersLogged = (try? container.decode(Int.self, forKey: .watersLogged)) ?? 0
+        focusMinutes = (try? container.decode(Int.self, forKey: .focusMinutes)) ?? 0
+        focusWarnings = (try? container.decode(Int.self, forKey: .focusWarnings)) ?? 0
+        waterMilliliters = (try? container.decode(Int.self, forKey: .waterMilliliters)) ?? 0
     }
 
     /// Ported from `createEmptyStats`.
@@ -37,17 +58,20 @@ public struct StatsTotals: Equatable, Sendable {
     public var watersLogged: Int
     public var focusMinutes: Int
     public var focusWarnings: Int
+    public var waterMilliliters: Int
 
     public init(
         breaksTaken: Int = 0,
         watersLogged: Int = 0,
         focusMinutes: Int = 0,
-        focusWarnings: Int = 0
+        focusWarnings: Int = 0,
+        waterMilliliters: Int = 0
     ) {
         self.breaksTaken = breaksTaken
         self.watersLogged = watersLogged
         self.focusMinutes = focusMinutes
         self.focusWarnings = focusWarnings
+        self.waterMilliliters = waterMilliliters
     }
 
     /// Sum of every counter across `days`.
@@ -57,6 +81,7 @@ public struct StatsTotals: Equatable, Sendable {
             totals.watersLogged += day.watersLogged
             totals.focusMinutes += day.focusMinutes
             totals.focusWarnings += day.focusWarnings
+            totals.waterMilliliters += day.waterMilliliters
         }
     }
 }

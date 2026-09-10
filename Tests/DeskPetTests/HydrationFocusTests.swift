@@ -35,17 +35,33 @@ struct StatsStoreTests {
     @Test("StatsTotals.summing adds every counter across days")
     func statsTotalsSumming() {
         let days = [
-            DayStats(date: "2026-09-01", breaksTaken: 1, watersLogged: 3, focusMinutes: 1, focusWarnings: 0),
-            DayStats(date: "2026-09-02", breaksTaken: 0, watersLogged: 4, focusMinutes: 10, focusWarnings: 5),
-            DayStats(date: "2026-09-03", breaksTaken: 1, watersLogged: 4, focusMinutes: 0, focusWarnings: 0)
+            DayStats(date: "2026-09-01", breaksTaken: 1, watersLogged: 3, focusMinutes: 1, focusWarnings: 0, waterMilliliters: 750),
+            DayStats(date: "2026-09-02", breaksTaken: 0, watersLogged: 4, focusMinutes: 10, focusWarnings: 5, waterMilliliters: 1000),
+            DayStats(date: "2026-09-03", breaksTaken: 1, watersLogged: 4, focusMinutes: 0, focusWarnings: 0, waterMilliliters: 1000)
         ]
         let totals = StatsTotals.summing(days)
-        #expect(totals == StatsTotals(breaksTaken: 2, watersLogged: 11, focusMinutes: 11, focusWarnings: 5))
+        #expect(totals == StatsTotals(breaksTaken: 2, watersLogged: 11, focusMinutes: 11, focusWarnings: 5, waterMilliliters: 2750))
     }
 
     @Test("StatsTotals.summing of no days is all zero")
     func statsTotalsEmpty() {
         #expect(StatsTotals.summing([DayStats]()) == StatsTotals())
+    }
+
+    @Test("a DayStats payload without waterMilliliters decodes to 0")
+    func dayStatsMissingVolumeDefaultsZero() throws {
+        let json = #"{"date":"2026-08-28","breaksTaken":1,"watersLogged":5,"focusMinutes":0,"focusWarnings":0}"#
+        let decoded = try JSONDecoder().decode(DayStats.self, from: Data(json.utf8))
+        #expect(decoded.waterMilliliters == 0)
+        #expect(decoded.watersLogged == 5)
+    }
+
+    @Test("DayStats round-trips waterMilliliters")
+    func dayStatsVolumeRoundTrip() throws {
+        let day = DayStats(date: "2026-09-10", watersLogged: 5, waterMilliliters: 1250)
+        let data = try JSONEncoder().encode(day)
+        let decoded = try JSONDecoder().decode(DayStats.self, from: data)
+        #expect(decoded == day)
     }
 
     @Test("the first read creates today's entry")
@@ -254,8 +270,12 @@ struct HydrationFlowTests {
         let (state, clock, cleanup) = makeState()
         defer { cleanup() }
         state.start()
-        // Disable breaks so only hydration can fire.
-        state.updateSettings { $0.breakReminderEnabled = false }
+        // Disable breaks so only hydration can fire; use the fixed interval so
+        // this test exercises the firing mechanism independent of smart pacing.
+        state.updateSettings {
+            $0.breakReminderEnabled = false
+            $0.hydrationReminderStrategy = .fixedInterval
+        }
 
         clock.advance(by: 91 * 60)
         state.scheduler.tick()
@@ -284,6 +304,90 @@ struct HydrationFlowTests {
         #expect(!state.petWindow.isBubbleVisible, "the prompt is dismissed")
     }
 
+    @Test("logging a serving adds the configured volume and increments the count")
+    func servingAddsVolume() throws {
+        try #require(!NSScreen.screens.isEmpty, "no displays attached")
+        let (state, _, cleanup) = makeState()
+        defer { cleanup() }
+        state.start()
+        state.updateSettings { $0.hydrationServingMilliliters = 250 }
+
+        state.handle(.demoHydration)
+        tap(state, BubbleActionID.hydrationDone)
+
+        // recordServing runs synchronously within completeHydrationPrompt.
+        #expect(state.stats.watersLogged == 1)
+        #expect(state.stats.waterMilliliters == 250)
+        #expect(state.persistence.currentStats.waterMilliliters == 250)
+    }
+
+    @Test("logHydrationServing logs a serving without a prompt")
+    func quickAddServing() throws {
+        try #require(!NSScreen.screens.isEmpty, "no displays attached")
+        let (state, _, cleanup) = makeState()
+        defer { cleanup() }
+        state.start()
+        state.updateSettings { $0.hydrationServingMilliliters = 200 }
+
+        state.logHydrationServing()
+        #expect(state.stats.waterMilliliters == 200)
+        #expect(state.stats.watersLogged == 1)
+    }
+
+    @Test("reaching the daily goal shows the calm celebration and stops reminders")
+    func reachingGoalCelebratesAndStops() async throws {
+        try #require(!NSScreen.screens.isEmpty, "no displays attached")
+        let (state, _, cleanup) = makeState()
+        defer { cleanup() }
+        state.start()
+        // One 250 ml serving meets a 250 ml target — crosses 100% in a single log.
+        state.updateSettings {
+            $0.breakReminderEnabled = false
+            $0.hydrationServingMilliliters = 250
+            $0.hydrationTargetMilliliters = 250
+            $0.hydrationStopAtGoal = true
+        }
+
+        state.handle(.demoHydration)
+        tap(state, BubbleActionID.hydrationDone)
+        #expect(state.stats.waterMilliliters == 250)
+
+        // Past drinkingDuration (2.4s): the goal bubble appears.
+        try await Task.sleep(for: .milliseconds(2600))
+        #expect(state.petWindow.currentBubble?.id == BubbleID.hydrationGoal)
+
+        // Past the tail: reminders are silenced for the day (paced date is nil at goal).
+        try await Task.sleep(for: .milliseconds(2100))
+        #expect(state.scheduler.hydrationDueAt == nil, "stop-at-goal silences hydration")
+
+        // A second serving the same day does not re-fire the goal celebration.
+        state.logHydrationServing()
+        try await Task.sleep(for: .milliseconds(2600))
+        #expect(state.petWindow.currentBubble?.id != BubbleID.hydrationGoal)
+    }
+
+    @Test("crossing a mid-target milestone shows a milestone bubble")
+    func milestoneBubble() async throws {
+        try #require(!NSScreen.screens.isEmpty, "no displays attached")
+        let (state, _, cleanup) = makeState()
+        defer { cleanup() }
+        state.start()
+        // 250 of a 500 target = 50%.
+        state.updateSettings {
+            $0.breakReminderEnabled = false
+            $0.hydrationServingMilliliters = 250
+            $0.hydrationTargetMilliliters = 500
+        }
+
+        state.handle(.demoHydration)
+        tap(state, BubbleActionID.hydrationDone)
+
+        try await Task.sleep(for: .milliseconds(2600))
+        let bubble = state.petWindow.currentBubble
+        #expect(bubble?.id == BubbleID.hydrationComplete)
+        #expect(bubble?.message == Strings.Bubble.hydrationMilestone(50))
+    }
+
     @Test("the drinking sequence celebrates then reschedules and settles")
     func drinkingSequenceCompletes() async throws {
         try #require(!NSScreen.screens.isEmpty, "no displays attached")
@@ -306,7 +410,7 @@ struct HydrationFlowTests {
         #expect(state.scheduler.hydrationDueAt != nil, "the next reminder is scheduled")
     }
 
-    @Test("snoozing hydration settles the pet and reschedules 15 minutes out")
+    @Test("snoozing hydration settles the pet and reschedules 20 minutes out")
     func snoozeHydration() throws {
         try #require(!NSScreen.screens.isEmpty, "no displays attached")
         let (state, clock, cleanup) = makeState()
