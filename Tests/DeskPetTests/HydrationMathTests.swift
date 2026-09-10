@@ -224,4 +224,31 @@ struct HydrationMathTests {
         // No target.
         #expect(HydrationProgress.milestoneJustCrossed(previousMilliliters: 0, newMilliliters: 500, targetMilliliters: 0) == nil)
     }
+
+    // MARK: goals met
+
+    @Test("goalsMet judges each day against its own target snapshot")
+    func goalsMetPerDaySnapshot() {
+        let days = [
+            DayStats(date: "2026-09-10", waterMilliliters: 2000, waterTargetMilliliters: 2000), // met
+            DayStats(date: "2026-09-09", waterMilliliters: 1500, waterTargetMilliliters: 2000), // missed
+            DayStats(date: "2026-09-08", waterMilliliters: 3000, waterTargetMilliliters: 3000)  // met (different target)
+        ]
+        #expect(HydrationProgress.goalsMet(in: days, currentTargetMilliliters: 2000) == 2)
+    }
+
+    @Test("goalsMet falls back to the current target when a day has no snapshot")
+    func goalsMetFallback() {
+        let days = [
+            DayStats(date: "2026-09-07", waterMilliliters: 2100, waterTargetMilliliters: 0), // snapshot 0 → use current 2000 → met
+            DayStats(date: "2026-09-06", waterMilliliters: 500, waterTargetMilliliters: 0)   // 500 < 2000 → missed
+        ]
+        #expect(HydrationProgress.goalsMet(in: days, currentTargetMilliliters: 2000) == 1)
+    }
+
+    @Test("goalsMet counts nothing when there is no effective target")
+    func goalsMetNoTarget() {
+        let days = [DayStats(date: "2026-09-05", waterMilliliters: 500, waterTargetMilliliters: 0)]
+        #expect(HydrationProgress.goalsMet(in: days, currentTargetMilliliters: 0) == 0)
+    }
 }

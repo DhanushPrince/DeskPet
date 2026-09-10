@@ -67,6 +67,15 @@ public final class AppState {
 
     public private(set) var stats: DayStats
 
+    /// Amount of the most recent water log today, in millilitres, for a
+    /// single-level undo of an accidental log. Nil when there is nothing to undo
+    /// (nothing logged yet, already undone, or a new day). Not persisted — undo
+    /// is a same-session safety net, not history.
+    public private(set) var lastHydrationLogMilliliters: Int?
+
+    /// Whether the Today card / menu should offer an undo.
+    public var canUndoHydration: Bool { (lastHydrationLogMilliliters ?? 0) > 0 }
+
     /// Human-readable result of the last update check.
     public private(set) var updateStatusMessage = Strings.SettingsLabels.updateIdle
     public private(set) var lastUpdateCheck = UpdateCheckResult(
@@ -376,8 +385,13 @@ public final class AppState {
         statsStore.update {
             $0.watersLogged += 1
             $0.waterMilliliters += serving
+            // Snapshot the target that applied today so History can judge
+            // "goal met" for this day even if the target later changes.
+            $0.waterTargetMilliliters = target
         }
         stats = statsStore.current()
+        // Remember this log so it can be undone once (accidental-tap safety net).
+        lastHydrationLogMilliliters = serving
 
         let milestone = HydrationProgress.milestoneJustCrossed(
             previousMilliliters: previous,
@@ -396,6 +410,45 @@ public final class AppState {
     public func logHydrationServing() {
         guard isRunning else { return }
         completeHydrationPrompt()
+    }
+
+    /// Undoes the most recent water log today (single level) — for an accidental
+    /// tap. Subtracts the logged amount and decrements the count, clamped at 0,
+    /// then re-paces the next reminder. No-op when there is nothing to undo.
+    public func undoLastHydration() {
+        guard isRunning, let amount = lastHydrationLogMilliliters, amount > 0 else { return }
+
+        statsStore.update {
+            $0.waterMilliliters = max(0, $0.waterMilliliters - amount)
+            $0.watersLogged = max(0, $0.watersLogged - 1)
+        }
+        stats = statsStore.current()
+        // Single-level: nothing left to undo after one undo.
+        lastHydrationLogMilliliters = nil
+
+        // Re-pace: dropping back below the target re-enables reminders.
+        scheduler.scheduleHydration()
+        syncDerivedState()
+    }
+
+    /// Whether hydration reminders are paused for the rest of today.
+    public var hydrationPausedToday: Bool { scheduler.isHydrationPaused }
+
+    /// Pause or resume hydration reminders for the rest of the day (auto-resumes
+    /// tomorrow). Does not change saved settings.
+    public func setHydrationPausedToday(_ paused: Bool) {
+        scheduler.setHydrationPaused(paused)
+        syncDerivedState()
+    }
+
+    /// A CSV of today's stats plus the full history, most recent first.
+    public func exportStatsCSV() -> String {
+        var days = Array(statsStore.history.values)
+        // Ensure today is included even if not yet archived to history.
+        if !days.contains(where: { $0.date == stats.date }) {
+            days.append(stats)
+        }
+        return StatsCSV.export(days)
     }
 
     /// Ported from the `hydration:snooze` action.
@@ -548,7 +601,12 @@ public final class AppState {
     private func rollStatsDateIfNeeded() {
         // The store archives the outgoing day and adopts today, reusing an
         // existing entry if the app already ran earlier today.
+        let previousDate = stats.date
         stats = statsStore.current()
+        // A new calendar day invalidates the single-level undo.
+        if stats.date != previousDate {
+            lastHydrationLogMilliliters = nil
+        }
     }
 
     // MARK: - Settings
@@ -1035,6 +1093,7 @@ public final class AppState {
         stateMachine.resetMuteForNewDay()
         scheduler.setBreakMuted(false)
         stats = statsStore.resetToday()
+        lastHydrationLogMilliliters = nil
     }
 
     // MARK: - Menu

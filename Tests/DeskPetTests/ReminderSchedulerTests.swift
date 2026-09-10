@@ -491,6 +491,20 @@ struct ReminderSchedulerTests {
         let (scheduler, _) = makePacingScheduler(consumed: 2000, stopAtGoal: false)
         #expect(scheduler.hydrationDueAt != nil)
     }
+
+    @Test("pausing hydration clears the due date; resuming restores it")
+    func pauseAndResumeHydration() {
+        let (scheduler, _) = makePacingScheduler(consumed: 0)
+        #expect(scheduler.hydrationDueAt != nil)
+
+        scheduler.setHydrationPaused(true)
+        #expect(scheduler.isHydrationPaused)
+        #expect(scheduler.hydrationDueAt == nil)
+
+        scheduler.setHydrationPaused(false)
+        #expect(!scheduler.isHydrationPaused)
+        #expect(scheduler.hydrationDueAt != nil)
+    }
 }
 
 @Suite("Display change watcher", .serialized)

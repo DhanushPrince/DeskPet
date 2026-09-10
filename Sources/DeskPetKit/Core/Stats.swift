@@ -11,6 +11,10 @@ public struct DayStats: Equatable, Codable, Sendable {
     /// Total water volume logged for the day, in millilitres. Newer than the
     /// other counters, so older `stats.json` files omit it (decodes to 0).
     public var waterMilliliters: Int
+    /// The hydration target that applied on this day, in millilitres, captured
+    /// when water is logged. Lets History judge "goal met" for past days even
+    /// after the current target changes. 0 means "unknown / not recorded".
+    public var waterTargetMilliliters: Int
 
     public init(
         date: String,
@@ -18,7 +22,8 @@ public struct DayStats: Equatable, Codable, Sendable {
         watersLogged: Int = 0,
         focusMinutes: Int = 0,
         focusWarnings: Int = 0,
-        waterMilliliters: Int = 0
+        waterMilliliters: Int = 0,
+        waterTargetMilliliters: Int = 0
     ) {
         self.date = date
         self.breaksTaken = breaksTaken
@@ -26,14 +31,16 @@ public struct DayStats: Equatable, Codable, Sendable {
         self.focusMinutes = focusMinutes
         self.focusWarnings = focusWarnings
         self.waterMilliliters = waterMilliliters
+        self.waterTargetMilliliters = waterTargetMilliliters
     }
 
     enum CodingKeys: String, CodingKey {
-        case date, breaksTaken, watersLogged, focusMinutes, focusWarnings, waterMilliliters
+        case date, breaksTaken, watersLogged, focusMinutes, focusWarnings
+        case waterMilliliters, waterTargetMilliliters
     }
 
-    /// A payload written before `waterMilliliters` existed lacks that key, so it
-    /// decodes to 0 rather than failing.
+    /// A payload written before these fields existed lacks the keys, so they
+    /// decode to 0 rather than failing.
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         date = try container.decode(String.self, forKey: .date)
@@ -42,6 +49,7 @@ public struct DayStats: Equatable, Codable, Sendable {
         focusMinutes = (try? container.decode(Int.self, forKey: .focusMinutes)) ?? 0
         focusWarnings = (try? container.decode(Int.self, forKey: .focusWarnings)) ?? 0
         waterMilliliters = (try? container.decode(Int.self, forKey: .waterMilliliters)) ?? 0
+        waterTargetMilliliters = (try? container.decode(Int.self, forKey: .waterTargetMilliliters)) ?? 0
     }
 
     /// Ported from `createEmptyStats`.

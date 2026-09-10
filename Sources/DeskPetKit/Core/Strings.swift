@@ -151,6 +151,7 @@ public enum Strings {
         public static let focusMinutes = "Focus"
         public static let warnings = "Distractions"
         public static let resetToday = "Reset Today"
+        public static let exportCSV = "Export CSV…"
         public static let history = "History"
         public static let historyLast7Days = "Last 7 days"
         public static let historyLegendTitle = "What the icons mean"
@@ -178,6 +179,12 @@ public enum Strings {
         public static let hydrationStopAtGoal = "Stop reminders when goal reached"
         public static let hydrationProgress = "Water"
         public static let addServing = "+"
+        public static let undoServing = "Undo"
+        public static let hydrationRhythm = "Rhythm"
+        public static let pauseHydrationToday = "Pause reminders today"
+        public static func goalsMet(_ met: Int, _ total: Int) -> String {
+            "\(met) of \(total) goals met"
+        }
         public static let hydrationInfoTitle = "How reminders are timed"
         public static let hydrationInfoSmart =
             "Smart pacing spreads your remaining glasses across your active hours "

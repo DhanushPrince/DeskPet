@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Colours transcribed from the settings window's stylesheet.
 enum SettingsStyle {
@@ -27,6 +28,7 @@ public struct SettingsView: View {
     @State private var historyLegendOpen = false
     @State private var metricPickerOpen = false
     @State private var hydrationInfoOpen = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(state: AppState) {
         self.state = state
@@ -476,6 +478,9 @@ public struct SettingsView: View {
                 Button(Strings.SettingsLabels.resetToday) {
                     state.resetTodayStats()
                 }
+                Button(Strings.SettingsLabels.exportCSV) {
+                    exportStatsCSV()
+                }
                 Spacer()
                 Button {
                     metricPickerOpen.toggle()
@@ -523,6 +528,8 @@ public struct SettingsView: View {
                     HistoryMetricRow(totals: weeklyTotals, metrics: visibleMetrics)
                 }
 
+                goalsMetRow
+
                 ForEach(recentHistory, id: \.date) { day in
                     HStack {
                         Text(day.date)
@@ -539,6 +546,36 @@ public struct SettingsView: View {
                 }
             }
         }
+    }
+
+    /// "Goals met: N of 7" over the recent days that had a hydration target.
+    /// Shown only when a target is set and the Waters metric is visible.
+    @ViewBuilder
+    private var goalsMetRow: some View {
+        if state.settings.hydrationTargetMilliliters > 0,
+           HistoryMetric.waters.isVisible(in: state.settings) {
+            let days = goalsMetDays
+            if !days.isEmpty {
+                let met = HydrationProgress.goalsMet(
+                    in: days,
+                    currentTargetMilliliters: state.settings.hydrationTargetMilliliters
+                )
+                HStack {
+                    Label(Strings.SettingsLabels.hydrationRhythm, systemImage: "calendar")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text(Strings.SettingsLabels.goalsMet(met, days.count))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    /// Today plus the recent history days, most recent first, capped at 7.
+    private var goalsMetDays: [DayStats] {
+        ([state.stats] + recentHistory).prefix(7).map { $0 }
     }
 
     @ViewBuilder
@@ -564,9 +601,26 @@ public struct SettingsView: View {
                             .font(.caption)
                     }
                     .help(Strings.SettingsLabels.hydrationProgress)
+                    if state.canUndoHydration {
+                        Button(Strings.SettingsLabels.undoServing) {
+                            state.undoLastHydration()
+                        }
+                        .font(.caption)
+                        .help(Strings.SettingsLabels.undoServing)
+                    }
                 }
                 ProgressView(value: progress.fraction)
                     .tint(SettingsStyle.accent)
+                    .animation(
+                        reduceMotion ? nil : .easeInOut(duration: 0.35),
+                        value: progress.fraction
+                    )
+                Toggle(Strings.SettingsLabels.pauseHydrationToday, isOn: Binding(
+                    get: { state.hydrationPausedToday },
+                    set: { state.setHydrationPausedToday($0) }
+                ))
+                .font(.caption)
+                .toggleStyle(.checkbox)
             }
         }
     }
@@ -605,6 +659,20 @@ public struct SettingsView: View {
             get: { metric.isVisible(in: state.settings) },
             set: { next in state.updateSettings { metric.setVisible(next, in: &$0) } }
         )
+    }
+
+    /// Presents a save panel and writes the stats CSV to the chosen file.
+    private func exportStatsCSV() {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "deskpet-stats.csv"
+        panel.allowedContentTypes = [.commaSeparatedText]
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try state.exportStatsCSV().write(to: url, atomically: true, encoding: .utf8)
+        } catch {
+            NSLog("DeskPet: CSV export failed: \(error.localizedDescription)")
+        }
     }
 
     /// Most recent days first, excluding today (shown above).

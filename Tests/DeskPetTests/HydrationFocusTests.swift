@@ -53,12 +53,13 @@ struct StatsStoreTests {
         let json = #"{"date":"2026-08-28","breaksTaken":1,"watersLogged":5,"focusMinutes":0,"focusWarnings":0}"#
         let decoded = try JSONDecoder().decode(DayStats.self, from: Data(json.utf8))
         #expect(decoded.waterMilliliters == 0)
+        #expect(decoded.waterTargetMilliliters == 0)
         #expect(decoded.watersLogged == 5)
     }
 
-    @Test("DayStats round-trips waterMilliliters")
+    @Test("DayStats round-trips waterMilliliters and the target snapshot")
     func dayStatsVolumeRoundTrip() throws {
-        let day = DayStats(date: "2026-09-10", watersLogged: 5, waterMilliliters: 1250)
+        let day = DayStats(date: "2026-09-10", watersLogged: 5, waterMilliliters: 1250, waterTargetMilliliters: 2000)
         let data = try JSONEncoder().encode(day)
         let decoded = try JSONDecoder().decode(DayStats.self, from: data)
         #expect(decoded == day)
@@ -319,6 +320,79 @@ struct HydrationFlowTests {
         #expect(state.stats.watersLogged == 1)
         #expect(state.stats.waterMilliliters == 250)
         #expect(state.persistence.currentStats.waterMilliliters == 250)
+    }
+
+    @Test("logging snapshots the day's hydration target")
+    func servingSnapshotsTarget() throws {
+        try #require(!NSScreen.screens.isEmpty, "no displays attached")
+        let (state, _, cleanup) = makeState()
+        defer { cleanup() }
+        state.start()
+        state.updateSettings {
+            $0.hydrationServingMilliliters = 250
+            $0.hydrationTargetMilliliters = 1500
+        }
+
+        state.logHydrationServing()
+        #expect(state.stats.waterTargetMilliliters == 1500)
+    }
+
+    @Test("undo removes the last logged serving and count")
+    func undoLastHydration() throws {
+        try #require(!NSScreen.screens.isEmpty, "no displays attached")
+        let (state, _, cleanup) = makeState()
+        defer { cleanup() }
+        state.start()
+        state.updateSettings { $0.hydrationServingMilliliters = 250 }
+
+        state.logHydrationServing()
+        #expect(state.stats.waterMilliliters == 250)
+        #expect(state.canUndoHydration)
+
+        state.undoLastHydration()
+        #expect(state.stats.waterMilliliters == 0)
+        #expect(state.stats.watersLogged == 0)
+        #expect(!state.canUndoHydration, "undo is single-level")
+
+        // A second undo is a no-op.
+        state.undoLastHydration()
+        #expect(state.stats.waterMilliliters == 0)
+    }
+
+    @Test("resetting today clears the pending undo")
+    func resetClearsUndo() throws {
+        try #require(!NSScreen.screens.isEmpty, "no displays attached")
+        let (state, _, cleanup) = makeState()
+        defer { cleanup() }
+        state.start()
+        state.updateSettings { $0.hydrationServingMilliliters = 250 }
+
+        state.logHydrationServing()
+        #expect(state.canUndoHydration)
+        state.resetTodayStats()
+        #expect(!state.canUndoHydration)
+        #expect(state.stats.waterMilliliters == 0)
+    }
+
+    @Test("pausing hydration today silences reminders until resumed")
+    func pauseHydrationToday() throws {
+        try #require(!NSScreen.screens.isEmpty, "no displays attached")
+        let (state, _, cleanup) = makeState()
+        defer { cleanup() }
+        state.start()
+        state.updateSettings {
+            $0.hydrationReminderEnabled = true
+            $0.hydrationTargetMilliliters = 2000
+        }
+        #expect(state.scheduler.hydrationDueAt != nil)
+
+        state.setHydrationPausedToday(true)
+        #expect(state.hydrationPausedToday)
+        #expect(state.scheduler.hydrationDueAt == nil)
+
+        state.setHydrationPausedToday(false)
+        #expect(!state.hydrationPausedToday)
+        #expect(state.scheduler.hydrationDueAt != nil)
     }
 
     @Test("logHydrationServing logs a serving without a prompt")

@@ -180,4 +180,21 @@ public struct HydrationProgress: Equatable, Sendable {
         }
         return crossed
     }
+
+    /// How many of the given days met their hydration goal. Each day is judged
+    /// against its own recorded target snapshot (`waterTargetMilliliters`); when
+    /// that snapshot is 0 (older data), it falls back to `currentTargetMilliliters`.
+    /// Days with no effective target are not counted as met.
+    public static func goalsMet(
+        in days: [DayStats],
+        currentTargetMilliliters: Int
+    ) -> Int {
+        days.reduce(0) { count, day in
+            let target = day.waterTargetMilliliters > 0
+                ? day.waterTargetMilliliters
+                : currentTargetMilliliters
+            let met = target > 0 && day.waterMilliliters >= target
+            return count + (met ? 1 : 0)
+        }
+    }
 }

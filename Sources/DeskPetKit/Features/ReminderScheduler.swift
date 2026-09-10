@@ -132,6 +132,9 @@ public final class ReminderScheduler {
     private let calendar: Calendar
     private var settings: Settings
     private var breakMuted = false
+    /// When true, hydration reminders are suppressed for the rest of the day
+    /// (user chose "pause today"). Cleared by the midnight rollover.
+    private var hydrationPaused = false
 
     private var timer: DispatchSourceTimer?
     private var midnightBoundary: Date?
@@ -215,6 +218,21 @@ public final class ReminderScheduler {
         armTimer()
     }
 
+    /// Whether hydration reminders are paused for the rest of the day.
+    public var isHydrationPaused: Bool { hydrationPaused }
+
+    /// Pause or resume hydration reminders for the day. Pausing clears the due
+    /// date; resuming reschedules from now. Auto-cleared at the midnight rollover.
+    public func setHydrationPaused(_ paused: Bool) {
+        hydrationPaused = paused
+        if paused {
+            schedule.hydrationDueAt = nil
+            armTimer()
+        } else {
+            scheduleHydration()
+        }
+    }
+
     /// Ported from `scheduleBreakReminderTimer`. A muted or disabled reminder
     /// clears its due date instead.
     public func scheduleBreak(after interval: TimeInterval? = nil) {
@@ -270,9 +288,11 @@ public final class ReminderScheduler {
     }
 
     private func nextHydrationDueDate() -> Date? {
+        // Paused for today: no hydration reminders until the midnight rollover.
+        guard !hydrationPaused else { return nil }
         // Smart pacing consults today's consumed volume and the active window;
         // fixed interval (and a zero target) fall back to the plain interval.
-        HydrationMath.nextHydrationDate(
+        return HydrationMath.nextHydrationDate(
             now: clock.now,
             settings: settings,
             consumedMilliliters: hydrationConsumedProvider(),
@@ -308,6 +328,8 @@ public final class ReminderScheduler {
 
         if let boundary = midnightBoundary, now >= boundary {
             midnightBoundary = ReminderMath.nextMidnight(after: now, calendar: calendar)
+            // A new day resumes hydration reminders paused "for today".
+            hydrationPaused = false
             onMidnight()
         }
 
