@@ -40,7 +40,7 @@ public enum BlockingMode: String, Codable, Sendable {
 
 /// The three bundled appearances. Raw values match the persisted identifiers
 /// used by the Electron build so migrated settings keep working; note that
-/// `lovartPuppy` is the Golden Puppy.
+/// `lovartPuppy` is Snowy.
 public enum BuiltInPetAppearanceID: String, CaseIterable, Codable, Sendable {
     case lovartPuppy
     case lineDog

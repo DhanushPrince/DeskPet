@@ -3,13 +3,13 @@ import Testing
 @testable import DeskPetKit
 
 /// Ported from `tests/petAppearances.test.ts`, extended to cover all three
-/// appearances rather than only Xiao Ji Mao.
+/// appearances rather than only Boba.
 @Suite("Pet appearances")
 struct PetAppearanceTests {
 
     // MARK: Ported cases
 
-    @Test("options() includes Xiao Ji Mao")
+    @Test("options() includes Boba")
     func optionsIncludeXiaoJiMao() {
         #expect(PetAppearances.options().contains { $0.value == .xiaoJiMao })
     }
@@ -99,7 +99,7 @@ struct PetAppearanceTests {
         }
     }
 
-    @Test("Golden Puppy borrows happy artwork for the three *Done states")
+    @Test("Snowy borrows happy artwork for the three *Done states")
     func goldenPuppyDoneStatesBorrowHappy() {
         let happy = PetAppearances.assetDefinition(appearance: .lovartPuppy, state: .happy)
         for state in [PetState.breakDone, .hydrationDone, .focusDone] {
@@ -108,7 +108,7 @@ struct PetAppearanceTests {
         }
     }
 
-    @Test("Line Dog has its own artwork for the three *Done states")
+    @Test("Moochu has its own artwork for the three *Done states")
     func lineDogDoneStatesAreDistinct() {
         let happy = PetAppearances.assetDefinition(appearance: .lineDog, state: .happy)
         for state in [PetState.breakDone, .hydrationDone, .focusDone] {
@@ -119,14 +119,14 @@ struct PetAppearanceTests {
 
     @Test("placeholder states are flagged")
     func placeholderFlags() {
-        // Line Dog's `sitting` borrows an idle GIF and is marked a placeholder.
+        // Moochu's `sitting` borrows an idle GIF and is marked a placeholder.
         #expect(PetAppearances.assetDefinition(appearance: .lineDog, state: .sitting).isPlaceholder)
         #expect(!PetAppearances.assetDefinition(appearance: .lineDog, state: .idle).isPlaceholder)
-        // Golden Puppy reuses its sleeping GIF for `sad`.
+        // Snowy reuses its sleeping GIF for `sad`.
         #expect(PetAppearances.assetDefinition(appearance: .lovartPuppy, state: .sad).isPlaceholder)
     }
 
-    @Test("Golden Puppy breakRunning carries the 4500ms replay interval")
+    @Test("Snowy breakRunning carries the 4500ms replay interval")
     func replayInterval() {
         let running = PetAppearances.assetDefinition(appearance: .lovartPuppy, state: .breakRunning)
         #expect(running.replayIntervalMs == 4500)

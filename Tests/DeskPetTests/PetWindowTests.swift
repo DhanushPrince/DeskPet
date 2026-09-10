@@ -95,7 +95,7 @@ struct PetAnimationTests {
 
     // MARK: Replay interval
 
-    @Test("only Golden Puppy's breakRunning schedules a replay")
+    @Test("only Snowy's breakRunning schedules a replay")
     func replayIntervalStates() {
         for appearance in BuiltInPetAppearanceID.allCases {
             let id = PetAppearanceID(rawValue: appearance.rawValue)!

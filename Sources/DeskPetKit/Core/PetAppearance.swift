@@ -164,7 +164,7 @@ public enum PetAppearances {
 
 private extension PetAppearances {
     /// Builds a bundled definition. `stateFolder` is explicit because several
-    /// states borrow another state's directory (for example Line Dog's
+    /// states borrow another state's directory (for example Moochu's
     /// `sitting`, which points at `idle`).
     static func bundled(
         _ folder: String,
@@ -181,13 +181,13 @@ private extension PetAppearances {
         )
     }
 
-    // MARK: Golden Puppy
+    // MARK: Snowy
 
     static var goldenPuppy: PetAppearanceManifest {
         let f = "GoldenPuppy"
         return PetAppearanceManifest(
             id: .lovartPuppy,
-            label: "Golden Puppy (beta)",
+            label: "Snowy",
             folder: f,
             fallback: bundled(f, .idle, ["standing pose.gif"], placeholder: true),
             states: [
@@ -217,13 +217,13 @@ private extension PetAppearances {
         )
     }
 
-    // MARK: Line Dog
+    // MARK: Moochu
 
     static var lineDog: PetAppearanceManifest {
         let f = "LineDog"
         return PetAppearanceManifest(
             id: .lineDog,
-            label: "Line Dog",
+            label: "Moochu",
             folder: f,
             fallback: bundled(f, .idle, ["线条小狗第9弹_甩耳朵.gif"], placeholder: true),
             states: [
@@ -284,13 +284,13 @@ private extension PetAppearances {
         )
     }
 
-    // MARK: Xiao Ji Mao
+    // MARK: Boba
 
     static var xiaoJiMao: PetAppearanceManifest {
         let f = "XiaoJiMao"
         return PetAppearanceManifest(
             id: .xiaoJiMao,
-            label: "Xiao Ji Mao",
+            label: "Boba",
             folder: f,
             fallback: bundled(f, .idle, ["线条小狗第6弹_放松.gif"], placeholder: true),
             states: [

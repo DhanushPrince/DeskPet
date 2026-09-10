@@ -148,7 +148,7 @@ struct GIFDecoderTests {
         print("probed \(probed) bundled GIFs, \(totalFrames) frames total")
     }
 
-    @Test("the default Line Dog idle animation decodes to real frames")
+    @Test("the default Moochu idle animation decodes to real frames")
     func lineDogIdleDecodes() throws {
         let definition = PetAppearances.assetDefinition(appearance: .lineDog, state: .idle)
         let urls = PetAssetLoader.urls(for: definition)
