@@ -60,8 +60,12 @@ public final class AppState {
     public var settings: Settings {
         didSet {
             guard settings != oldValue else { return }
+            let playOnDesktopChanged = settings.playOnDesktop != oldValue.playOnDesktop
             persistence.settings = settings
             applySettings()
+            if playOnDesktopChanged {
+                applyPlacementMode()
+            }
         }
     }
 
@@ -165,7 +169,9 @@ public final class AppState {
         }
 
         petWindow.isDragBlocked = { [weak self] in
-            self?.stateMachine.blockingMode == .breakRun
+            guard let self else { return true }
+            // Block dragging during break run or when in notch/menu bar mode
+            return self.stateMachine.blockingMode == .breakRun || !self.settings.playOnDesktop
         }
         petWindow.onPetClicked = { [weak self] in
             self?.handlePetClicked()
@@ -254,6 +260,10 @@ public final class AppState {
         if persistence.petHiddenByUser {
             NSLog("DeskPet: pet stays hidden (hidden by user)")
         } else {
+            // Position pet in notch/menu bar if not in desktop roam mode
+            if !settings.playOnDesktop {
+                petWindow.moveToNotchMenuBar()
+            }
             petWindow.show()
         }
         rollStatsDateIfNeeded()
@@ -621,6 +631,14 @@ public final class AppState {
             meetingHideWatcher.update(enabled: settings.hidePetDuringMeetings)
         }
         LoginItemService.apply(enabled: settings.launchAtLoginEnabled)
+    }
+
+    /// Applies the playOnDesktop placement mode. When switching from desktop
+    /// roam to notch/menu bar, repositions the pet.
+    public func applyPlacementMode() {
+        guard isRunning, petWindow.isVisible, !settings.playOnDesktop else { return }
+        // When switching to notch/menu bar mode, reposition the pet
+        petWindow.moveToNotchMenuBar()
     }
 
     private func syncLaunchAtLoginFromSystem() {

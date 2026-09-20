@@ -148,6 +148,21 @@ public enum DisplayGeometry {
         )
     }
 
+    /// Where the pet window should open in notch/menu bar mode: top-center of
+    /// the primary display, just below the menu bar (or in the notch area on
+    /// MacBooks with a notch).
+    public static func notchMenuBarBounds(
+        primaryDisplay: DisplayBounds,
+        size: CGSize
+    ) -> GlobalRect {
+        let work = primaryDisplay.workArea
+        // Center horizontally on the display
+        let x = jsRound(work.x + work.width / 2 - size.width / 2)
+        // Position at the top of the work area (just below menu bar)
+        let y = work.y
+        return GlobalRect(x: x, y: y, width: size.width, height: size.height)
+    }
+
     /// Where the pet window should open. With no saved position it sits
     /// bottom-centre of the primary display.
     public static func initialBounds(

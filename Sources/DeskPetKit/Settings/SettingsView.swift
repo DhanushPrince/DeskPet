@@ -324,6 +324,21 @@ public struct SettingsView: View {
 
             Divider()
 
+            VStack(alignment: .leading, spacing: 4) {
+                Text(Strings.SettingsLabels.placement)
+                    .font(.subheadline.weight(.semibold))
+
+                Toggle(Strings.SettingsLabels.playOnDesktop, isOn: boolBinding(
+                    get: { $0.playOnDesktop },
+                    set: { $0.playOnDesktop = $1 }
+                ))
+                Text(Strings.SettingsLabels.playOnDesktopHelp)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Divider()
+
             Toggle(Strings.SettingsLabels.hidePetDuringMeetings, isOn: boolBinding(
                 get: { $0.hidePetDuringMeetings },
                 set: { $0.hidePetDuringMeetings = $1 }

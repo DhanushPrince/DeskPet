@@ -32,7 +32,8 @@ public final class PetWindowController {
     /// Fires when a drag finishes, with the position to persist.
     public var onPositionChanged: ((SavedWindowPosition) -> Void)?
     /// Blocks dragging while true. Set during the break run, which owns the
-    /// pet's position (`blockingMode === "breakRun"` in the Electron build).
+    /// pet's position (`blockingMode === "breakRun"` in the Electron build),
+    /// and when playOnDesktop is false (notch/menu bar mode).
     public var isDragBlocked: () -> Bool = { false }
 
     // MARK: Drag state
@@ -250,6 +251,16 @@ public final class PetWindowController {
         if clamped != current {
             setGlobalBounds(clamped)
         }
+        persistPosition()
+    }
+
+    /// Repositions the pet to the notch/menu bar area.
+    public func moveToNotchMenuBar() {
+        let notchBounds = DisplayGeometry.notchMenuBarBounds(
+            primaryDisplay: ScreenBridge.primaryDisplay,
+            size: Constants.petWindowSize
+        )
+        setGlobalBounds(notchBounds)
         persistPosition()
     }
 

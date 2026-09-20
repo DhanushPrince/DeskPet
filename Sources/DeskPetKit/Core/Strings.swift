@@ -68,7 +68,12 @@ public enum Strings {
         public static let focusDuration = "Focus Duration"
         public static let startFocus = "Start Focus"
         public static let stopFocus = "Stop Focus"
-        public static let hidePetDuringMeetings = "Hide Pet During Meetings"
+        public static let placement = "Pet Location"
+        public static let playOnDesktop = "Play on desktop"
+        public static let playOnDesktopHelp =
+            "When enabled, the pet roams freely across your desktop. "
+            + "When disabled, the pet stays in the notch and menu bar area."
+        public static let hidePetDuringMeetings = "Hide during calls & presentations"
         public static let hidePetDuringMeetingsHelp =
             "Hides the pet while Microsoft Teams reports an active call. "
             + "No Accessibility permission required."

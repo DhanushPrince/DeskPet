@@ -98,6 +98,22 @@ struct SettingsNormalizationTests {
         #expect(decoded.showDistractionsStat)
     }
 
+    @Test("absent playOnDesktop defaults to true preserving desktop roam for existing users")
+    func missingPlayOnDesktopDefaultsTrue() throws {
+        // Existing users' settings lack this key; default to true to preserve
+        // the previous always-roaming behavior.
+        let json = #"{"petAppearanceId":"lineDog","breakReminderEnabled":true}"#
+        let decoded = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
+        #expect(decoded.playOnDesktop)
+    }
+
+    @Test("explicit playOnDesktop false is preserved")
+    func explicitPlayOnDesktopPreserved() throws {
+        let json = #"{"playOnDesktop":false}"#
+        let decoded = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
+        #expect(!decoded.playOnDesktop)
+    }
+
     @Test("stored stat-visibility flags are preserved")
     func statVisibilityPreserved() throws {
         let json = #"{"showBreaksStat":true,"showWatersStat":true,"showFocusStat":false,"showDistractionsStat":false}"#

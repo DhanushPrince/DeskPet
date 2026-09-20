@@ -23,6 +23,20 @@ struct DisplayGeometryTests {
 
     // MARK: Ported cases
 
+    @Test("notch/menu bar placement centers pet at top of work area")
+    func notchMenuBarPlacement() {
+        let bounds = DisplayGeometry.notchMenuBarBounds(
+            primaryDisplay: Self.primary,
+            size: Self.petSize
+        )
+        // Should be centered horizontally: (1440 - 220) / 2 = 610
+        #expect(bounds.x == 610)
+        // Should be at top of work area
+        #expect(bounds.y == 0)
+        #expect(bounds.width == Self.petSize.width)
+        #expect(bounds.height == Self.petSize.height)
+    }
+
     @Test("a pet on a removed display is moved back into the primary work area")
     func clampsBackFromRemovedDisplay() {
         let offscreen = rect(x: 2400, y: 560)
