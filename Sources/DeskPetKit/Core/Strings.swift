@@ -216,6 +216,9 @@ public enum Strings {
             case .focusDone: return "Focus Done"
             case .sad: return "Sad"
             case .sleeping: return "Sleeping"
+            case .thirsty: return "Thirsty"
+            case .restless: return "Restless"
+            case .celebrating: return "Celebrating"
             }
         }
     }

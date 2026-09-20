@@ -28,12 +28,15 @@ public final class PetContentView: NSView {
     /// Drag finished or was cancelled.
     public var onDragEnd: () -> Void = {}
     public var onRightClick: (NSEvent) -> Void = { _ in }
+    /// Provides dynamic status text for the hover tooltip.
+    public var statusTextProvider: (() -> String?)?
 
     private struct DragTracking {
         let start: CGPoint
         var isDragging: Bool
     }
     private var drag: DragTracking?
+    private var trackingArea: NSTrackingArea?
 
     public var facing: PetFacing = .right {
         didSet {
@@ -54,6 +57,39 @@ public final class PetContentView: NSView {
         addSubview(bubbleView)
         focusBadge.isHidden = true
         addSubview(focusBadge)
+        
+        setupTooltipTracking()
+    }
+    
+    private func setupTooltipTracking() {
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        trackingArea = area
+    }
+    
+    public override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let existing = trackingArea {
+            removeTrackingArea(existing)
+        }
+        setupTooltipTracking()
+    }
+    
+    public override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        if let text = statusTextProvider?() {
+            toolTip = text
+        }
+    }
+    
+    public override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        toolTip = nil
     }
 
     @available(*, unavailable)

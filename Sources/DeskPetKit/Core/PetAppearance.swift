@@ -78,7 +78,10 @@ public enum PetAppearances {
     public static let stateFallbacks: [PetState: PetState] = [
         .breakDone: .happy,
         .hydrationDone: .happy,
-        .focusDone: .happy
+        .focusDone: .happy,
+        .thirsty: .hydrationPrompt,
+        .restless: .breakPrompt,
+        .celebrating: .happy
     ]
 
     /// A custom appearance is only usable once these states have artwork.

@@ -186,6 +186,9 @@ public final class AppState {
         petWindow.onBubbleAction = { [weak self] id in
             self?.handleBubbleAction(id)
         }
+        petWindow.statusTextProvider = { [weak self] in
+            self?.statusText
+        }
 
         scheduler.onReminderDue = { [weak self] kind in
             self?.handleReminderDue(kind) ?? .deferred
@@ -352,10 +355,16 @@ public final class AppState {
             let message: String
             if crossing.reachedGoal {
                 message = Strings.pick(Strings.Bubble.hydrationGoal)
+                // Signal goal completion for celebrating state
+                self.stateMachine.wellnessSignals.goalCompleted = true
             } else if let milestone = crossing.milestone {
                 message = Strings.Bubble.hydrationMilestone(milestone)
+                // Milestones get acknowledgement, not full celebration
+                self.stateMachine.wellnessSignals.recentAcknowledgement = true
             } else {
                 message = Strings.pick(Strings.Bubble.hydrationDone)
+                // Regular completion gets acknowledgement
+                self.stateMachine.wellnessSignals.recentAcknowledgement = true
             }
 
             self.showBubble(SpeechBubble(
@@ -366,6 +375,9 @@ public final class AppState {
 
             self.after(Constants.hydrationDoneReturnDelay) { [weak self] in
                 guard let self else { return }
+                // Clear transient signals after display
+                self.stateMachine.wellnessSignals.goalCompleted = false
+                self.stateMachine.wellnessSignals.recentAcknowledgement = false
                 // Reschedule from the end of this drink. When the goal is reached
                 // (and stop-at-goal is on) the paced date is nil, so hydration
                 // goes quiet for the rest of the day automatically.
@@ -530,6 +542,9 @@ public final class AppState {
         breakRunner.cancel()
         breakRunPhrasing = nil
         stateMachine.finishBreakRun()
+        
+        // Signal acknowledgement for break completion
+        stateMachine.wellnessSignals.recentAcknowledgement = true
 
         hideBubble()
         showBubble(SpeechBubble(
@@ -542,7 +557,10 @@ public final class AppState {
         syncDerivedState()
 
         after(Constants.breakDoneReturnDelay) { [weak self] in
-            self?.settleAfterSequence()
+            guard let self else { return }
+            // Clear acknowledgement signal after display
+            self.stateMachine.wellnessSignals.recentAcknowledgement = false
+            self.settleAfterSequence()
         }
     }
 
@@ -1007,6 +1025,11 @@ public final class AppState {
 
         statsStore.update { $0.focusMinutes += minutes }
         stats = statsStore.current()
+        
+        // Completed focus sessions get celebration
+        if completed {
+            stateMachine.wellnessSignals.goalCompleted = true
+        }
 
         showBubble(SpeechBubble(
             id: BubbleID.focusComplete,
@@ -1018,7 +1041,10 @@ public final class AppState {
         syncDerivedState()
 
         after(Constants.focusCompleteReturnDelay) { [weak self] in
-            self?.settleAfterSequence()
+            guard let self else { return }
+            // Clear celebration signal after display
+            self.stateMachine.wellnessSignals.goalCompleted = false
+            self.settleAfterSequence()
         }
     }
 
@@ -1132,6 +1158,59 @@ public final class AppState {
             hydrationSummary: summary
         )
     }
+    
+    /// Current status text for hover/tooltip display.
+    /// Returns a concise status like "Focus: 18:42 left" or "Water in 12 min".
+    public var statusText: String? {
+        let now = clock.now
+        
+        // Focus session takes priority
+        if focusActive, let endsAt = focusEndsAt {
+            let remaining = max(0, endsAt.timeIntervalSince(now))
+            let minutes = Int(remaining / 60)
+            let seconds = Int(remaining.truncatingRemainder(dividingBy: 60))
+            return String(format: "Focus: %d:%02d left", minutes, seconds)
+        }
+        
+        // Next: break reminder countdown
+        if let breakDue = scheduler.breakDueAt, settings.breakReminderEnabled {
+            let remaining = breakDue.timeIntervalSince(now)
+            if remaining > 0 {
+                let minutes = Int(remaining / 60)
+                if minutes < 60 {
+                    return "Break in \(minutes) min"
+                }
+            }
+        }
+        
+        // Next: hydration reminder countdown
+        if let hydrationDue = scheduler.hydrationDueAt, settings.hydrationReminderEnabled {
+            let remaining = hydrationDue.timeIntervalSince(now)
+            if remaining > 0 {
+                let minutes = Int(remaining / 60)
+                if minutes < 60 {
+                    return "Water in \(minutes) min"
+                }
+            }
+        }
+        
+        // Hydration progress (if target is set)
+        let target = settings.hydrationTargetMilliliters
+        if target > 0 {
+            let progress = HydrationProgress(
+                consumedMilliliters: stats.waterMilliliters,
+                targetMilliliters: target
+            )
+            if progress.isGoalReached {
+                return "💧 Goal reached today!"
+            } else {
+                return "💧 \(progress.summaryString)"
+            }
+        }
+        
+        // Default: nothing special to report
+        return nil
+    }
 
     public func handle(_ action: MenuAction) {
         switch action {
@@ -1191,7 +1270,45 @@ public final class AppState {
         petVisible = petWindow.isVisible
         focusActive = stateMachine.focusActive
         blockingMode = stateMachine.blockingMode
+        updateWellnessSignals()
         statusBar?.refresh()
+    }
+    
+    /// Updates wellness signals based on current scheduler state and stats.
+    /// Called from syncDerivedState so signals reflect app state changes.
+    private func updateWellnessSignals() {
+        let now = clock.now
+        
+        // Hydration due soon: within 5 minutes of the due time
+        let hydrationDueSoon: Bool
+        if let dueAt = scheduler.hydrationDueAt {
+            let remaining = dueAt.timeIntervalSince(now)
+            hydrationDueSoon = remaining > 0 && remaining <= 5 * 60
+        } else {
+            hydrationDueSoon = false
+        }
+        
+        // Break due soon: within 5 minutes of the due time
+        let breakDueSoon: Bool
+        if let dueAt = scheduler.breakDueAt {
+            let remaining = dueAt.timeIntervalSince(now)
+            breakDueSoon = remaining > 0 && remaining <= 5 * 60
+        } else {
+            breakDueSoon = false
+        }
+        
+        // Update the state machine's signals
+        stateMachine.wellnessSignals = WellnessSignals(
+            hydrationDueSoon: hydrationDueSoon,
+            breakDueSoon: breakDueSoon,
+            recentAcknowledgement: false,
+            goalCompleted: false
+        )
+        
+        // Refresh the ambient state if not blocked
+        if stateMachine.blockingMode == nil {
+            stateMachine.settleAfterTransientState()
+        }
     }
 
     // MARK: - Debug

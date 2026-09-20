@@ -118,7 +118,10 @@ public enum Constants {
 
     /// States that persist long enough to warrant rotating between variants.
     /// `CONTINUOUS_ASSET_STATES` in `PetView.tsx`.
-    public static let continuousAssetStates: Set<PetState> = [.idle, .focusGuard]
+    /// Includes wellness cue states for notch/menu bar ambient display.
+    public static let continuousAssetStates: Set<PetState> = [
+        .idle, .focusGuard, .thirsty, .restless
+    ]
     /// `CONTINUOUS_ASSET_ROTATION_MS` in `PetView.tsx`.
     public static let continuousAssetRotation: TimeInterval = 15 * 60
 }

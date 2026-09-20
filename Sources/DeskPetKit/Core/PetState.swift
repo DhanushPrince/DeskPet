@@ -22,6 +22,9 @@ public enum PetState: String, CaseIterable, Codable, CodingKeyRepresentable, Sen
     case focusDone
     case sad
     case sleeping
+    case thirsty
+    case restless
+    case celebrating
 }
 
 public enum PetFacing: String, Codable, Sendable {

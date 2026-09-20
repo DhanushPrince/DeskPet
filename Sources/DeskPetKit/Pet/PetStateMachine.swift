@@ -1,5 +1,32 @@
 import Foundation
 
+/// Wellness signals that influence the pet's ambient state.
+///
+/// These track upcoming reminders and recent achievements to display at-a-glance
+/// wellness cues in notch/menu bar mode without requiring explicit prompts.
+public struct WellnessSignals: Equatable, Sendable {
+    /// Hydration reminder is approaching (within threshold).
+    public var hydrationDueSoon: Bool
+    /// Break reminder is approaching (within threshold).
+    public var breakDueSoon: Bool
+    /// User just completed a hydration or break action (fades after display).
+    public var recentAcknowledgement: Bool
+    /// Daily hydration goal or focus session just completed.
+    public var goalCompleted: Bool
+    
+    public init(
+        hydrationDueSoon: Bool = false,
+        breakDueSoon: Bool = false,
+        recentAcknowledgement: Bool = false,
+        goalCompleted: Bool = false
+    ) {
+        self.hydrationDueSoon = hydrationDueSoon
+        self.breakDueSoon = breakDueSoon
+        self.recentAcknowledgement = recentAcknowledgement
+        self.goalCompleted = goalCompleted
+    }
+}
+
 /// Owns the pet's state, the active blocking mode, and focus session status.
 ///
 /// Ported from the module-level state and trigger functions in `main.ts`. The
@@ -16,6 +43,8 @@ public final class PetStateMachine {
     /// Electron build; Task 11 resets it at midnight.
     public private(set) var breakMutedToday = false
     public private(set) var focusStartedAt: Date?
+    /// Wellness signals for ambient state cues.
+    public var wellnessSignals = WellnessSignals()
 
     /// Called on every state change, including redundant assignments — the
     /// Electron build re-sent `pet:set-state` unconditionally, which is what
@@ -40,8 +69,35 @@ public final class PetStateMachine {
     }
 
     /// The state the pet settles into between events.
+    /// Now wellness-aware: reflects hydration/break due status for at-a-glance cues.
     public var longTermState: PetState {
-        focusActive ? .focusGuard : .idle
+        if focusActive {
+            return .focusGuard
+        }
+        
+        // Priority order for wellness cues in notch/menu bar mode:
+        // 1. Goal celebration (brief)
+        if wellnessSignals.goalCompleted {
+            return .celebrating
+        }
+        
+        // 2. Recent acknowledgement (user just logged water/break)
+        if wellnessSignals.recentAcknowledgement {
+            return .happy
+        }
+        
+        // 3. Break approaching (restless - wants to move)
+        if wellnessSignals.breakDueSoon {
+            return .restless
+        }
+        
+        // 4. Thirsty (hydration due soon)
+        if wellnessSignals.hydrationDueSoon {
+            return .thirsty
+        }
+        
+        // 5. Default resting state
+        return .idle
     }
 
     /// Whether a due reminder may be surfaced right now. Combined with the

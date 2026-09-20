@@ -43,6 +43,9 @@ public final class PetWindowController {
     private var dragSafetyTimer: Timer?
     private var bubbleTimer: Timer?
 
+    /// Status text provider, wired from AppState for hover tooltip.
+    public var statusTextProvider: (() -> String?)?
+
     public init(savedPosition: SavedWindowPosition? = nil) {
         let displays = ScreenBridge.displays
         let primary = ScreenBridge.primaryDisplay
@@ -63,6 +66,7 @@ public final class PetWindowController {
         contentView.onDragEnd = { [weak self] in self?.stopDrag() }
         contentView.onRightClick = { [weak self] event in self?.handleRightClick(event) }
         contentView.bubbleView.onAction = { [weak self] id in self?.onBubbleAction(id) }
+        contentView.statusTextProvider = { [weak self] in self?.statusTextProvider?() }
 
         // Keep the bubble clickable even where it extends past the pet's hitbox.
         mouseTracker.additionalInteractiveRects = { [weak self] in
