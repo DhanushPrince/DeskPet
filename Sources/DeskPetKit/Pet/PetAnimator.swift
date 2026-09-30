@@ -24,6 +24,8 @@ public final class PetAnimator {
 
     public init(layer: CALayer) {
         self.layer = layer
+        layer.isOpaque = false
+        layer.backgroundColor = nil
         layer.contentsGravity = .resizeAspect
         // Pixel-art GIFs: nearest is cheaper and sharper than trilinear.
         layer.magnificationFilter = .nearest

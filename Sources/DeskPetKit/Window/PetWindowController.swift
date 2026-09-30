@@ -75,6 +75,8 @@ public final class PetWindowController {
         window = PetWindow(contentRect: ScreenBridge.cocoaRect(from: globalBounds))
         contentView = PetContentView(frame: CGRect(origin: .zero, size: Constants.petWindowSize))
         window.contentView = contentView
+        window.isOpaque = false
+        window.backgroundColor = .clear
         mouseTracker = PetMouseTracker(window: window)
 
         contentView.onClick = { [weak self] in self?.onPetClicked() }
@@ -310,12 +312,14 @@ public final class PetWindowController {
 
     // MARK: - Notch Mode positioning
 
-    /// Resting states stay tucked in the camera. Reminders and reactions
-    /// slide down so the whole pet is visible below the notch. The break run
-    /// moves on its own and is left alone.
+    /// Resting states stay tucked in the camera. Reminders slide down so the
+    /// whole pet is visible below the notch. Short celebrations after a tap
+    /// are rest states too, so answering a reminder cannot leave the pet on
+    /// screen. The break run moves on its own and is left alone.
     private func isNotchRestState(_ state: PetState) -> Bool {
         switch state {
-        case .idle, .sitting, .sleeping, .focusGuard:
+        case .idle, .sitting, .sleeping, .focusGuard,
+             .happy, .hydrationDone, .breakDone, .sad:
             return true
         case .breakRunning:
             return false

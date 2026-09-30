@@ -45,6 +45,12 @@ public final class PetContentView: NSView {
     public override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
+        // A layer-backed view in a borderless window otherwise fills with black,
+        // which shows through the GIF's transparent pixels as a slab.
+        layer?.isOpaque = false
+        layer?.backgroundColor = NSColor.clear.cgColor
+        petLayer.isOpaque = false
+        petLayer.backgroundColor = nil
         layer?.addSublayer(petLayer)
         layoutPetLayer()
         petLayer.contentsScale = window?.backingScaleFactor ?? 2
@@ -60,6 +66,14 @@ public final class PetContentView: NSView {
     required init?(coder: NSCoder) { fatalError("not supported") }
 
     public override var isOpaque: Bool { false }
+
+    public override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        layer?.isOpaque = false
+        layer?.backgroundColor = NSColor.clear.cgColor
+        window?.isOpaque = false
+        window?.backgroundColor = .clear
+    }
 
     /// The pet's window never becomes key, so without this the first click
     /// would be swallowed as an activation click instead of reaching the pet.

@@ -230,6 +230,32 @@ struct PetWindowTests {
         #expect(controller.globalBounds == ScreenBridge.notchRestRect(size: Constants.petWindowSize))
     }
 
+    @Test("celebration states tuck back into the notch")
+    func notchModeHidesCelebrationStates() throws {
+        try #require(!NSScreen.screens.isEmpty, "no displays attached")
+        guard ScreenBridge.notchHangRect(size: Constants.petWindowSize) != nil else {
+            return
+        }
+
+        let controller = PetWindowController()
+        controller.show()
+        defer { controller.hide() }
+        controller.notchModeEnabled = true
+        drainNotchSlide()
+
+        guard let shown = ScreenBridge.notchHangRect(size: Constants.petWindowSize) else { return }
+        controller.setState(.hydrationPrompt)
+        drainNotchSlide()
+        #expect(controller.globalBounds == shown)
+
+        let rest = ScreenBridge.notchRestRect(size: Constants.petWindowSize)
+        for state in [PetState.happy, .hydrationDone, .breakDone, .sad] {
+            controller.setState(state)
+            drainNotchSlide()
+            #expect(controller.globalBounds == rest)
+        }
+    }
+
     @Test("clamping into the visible area re-pins to the notch in notch mode")
     func clampIntoVisibleAreaRepinsToNotch() throws {
         try #require(!NSScreen.screens.isEmpty, "no displays attached")

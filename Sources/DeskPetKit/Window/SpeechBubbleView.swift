@@ -65,6 +65,8 @@ public final class SpeechBubbleView: NSView {
     public override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
+        layer?.isOpaque = false
+        layer?.backgroundColor = NSColor.clear.cgColor
 
         messageLabel.isEditable = false
         messageLabel.isBordered = false
