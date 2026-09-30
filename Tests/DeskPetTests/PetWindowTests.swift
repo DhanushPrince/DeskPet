@@ -256,6 +256,43 @@ struct PetWindowTests {
         }
     }
 
+    @Test("a tall notch bubble keeps the dog's head inside the window")
+    func notchBubbleDoesNotClipHead() throws {
+        try #require(!NSScreen.screens.isEmpty, "no displays attached")
+        guard ScreenBridge.notchHangRect(size: Constants.petWindowSize) != nil else {
+            return
+        }
+
+        let controller = PetWindowController()
+        controller.show()
+        defer { controller.hide() }
+        controller.notchModeEnabled = true
+        controller.setState(.breakPrompt)
+        drainNotchSlide()
+
+        let beforeTop = controller.globalBounds.y
+            + Double(controller.globalBounds.height - controller.contentView.petSpriteFrame.maxY)
+
+        controller.showBubble(SpeechBubble(
+            id: "break",
+            message: "Sitting for so long... go walk for a minute!",
+            actions: [
+                BubbleAction(id: "stood", label: "I stood up", kind: .primary),
+                BubbleAction(id: "snooze", label: "Remind in 10 min"),
+                BubbleAction(id: "mute", label: "Leave me today", kind: .danger)
+            ]
+        ))
+        drainNotchSlide()
+        controller.contentView.layoutSubtreeIfNeeded()
+
+        let sprite = controller.contentView.petSpriteFrame
+        let afterTop = controller.globalBounds.y
+            + Double(controller.globalBounds.height - sprite.maxY)
+        #expect(sprite.maxY <= controller.contentView.bounds.height + 0.5)
+        #expect(controller.window.frame.height + 0.5 >= sprite.height + controller.contentView.bubbleDrop)
+        #expect(abs(afterTop - beforeTop) < 1)
+    }
+
     @Test("clamping into the visible area re-pins to the notch in notch mode")
     func clampIntoVisibleAreaRepinsToNotch() throws {
         try #require(!NSScreen.screens.isEmpty, "no displays attached")

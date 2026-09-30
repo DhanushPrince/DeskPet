@@ -74,6 +74,7 @@ public final class PetWindowController {
 
         window = PetWindow(contentRect: ScreenBridge.cocoaRect(from: globalBounds))
         contentView = PetContentView(frame: CGRect(origin: .zero, size: Constants.petWindowSize))
+        contentView.autoresizingMask = [.width, .height]
         window.contentView = contentView
         window.isOpaque = false
         window.backgroundColor = .clear
@@ -359,19 +360,44 @@ public final class PetWindowController {
             return
         }
         guard let target = isNotchRestState(state) ? notchRestRect() : notchShownRect() else { return }
+        let resolved = notchFrame(for: target)
         if animated {
             slideNotch(to: target)
-        } else if globalBounds != target {
+        } else if globalBounds != resolved {
             stopNotchSlide()
-            setGlobalBounds(target)
+            setGlobalBounds(resolved)
         }
+    }
+
+    /// Hang/rest rect plus the room a notch bubble needs under the dog.
+    ///
+    /// The sprite is lifted by the bubble height inside a window that only has
+    /// `notchSpriteTopInset` of space above it. A taller bubble would push the
+    /// head out through the top of the window, so the window grows to fit and
+    /// its top moves down only enough to keep the dog where it was.
+    private func notchFrame(for base: GlobalRect) -> GlobalRect {
+        var rect = base
+        let drop = Double(notchBubbleDrop)
+        let standard = Double(Constants.petWindowSize.height)
+        let needed = drop + Double(Constants.petSpriteSize.height)
+        let height = max(standard, needed)
+        rect.y += drop + standard - height
+        rect.height = height
+        return rect
     }
 
     private func slideNotch(to base: GlobalRect) {
         stopNotchSlide()
-        var target = base
-        target.y += Double(notchBubbleDrop)
-        let start = globalBounds
+        let target = notchFrame(for: base)
+        var start = globalBounds
+        if start.height != target.height {
+            // Top edge stays put so the extra height hangs downward. Apply it
+            // before the slide, or the lifted sprite is clipped until the
+            // height catches up.
+            start.height = target.height
+            setGlobalBounds(start)
+            start = globalBounds
+        }
         guard start != target else { return }
         let duration = Constants.notchSlideDuration
         let started = Date()
@@ -436,19 +462,21 @@ public final class PetWindowController {
     }
 
     /// Keeps the dog's screen position while the bubble is parked under it.
-    /// The window grows downward by the bubble height, and the sprite is
-    /// lifted inside the window by the same amount.
+    /// The sprite lifts by the bubble height; the window grows when that lift
+    /// would otherwise push the head out the top.
     private func syncNotchBubbleDrop() {
         let drop = notchModeEnabled && contentView.isBubbleVisible ? contentView.bubbleDrop : 0
-        let delta = drop - notchBubbleDrop
         notchBubbleDrop = drop
-        guard delta != 0 else { return }
-        var bounds = globalBounds
-        bounds.y += Double(delta)
-        setGlobalBounds(bounds)
-        guard notchSlideTimer != nil else { return }
+        guard notchModeEnabled, state != .breakRunning else { return }
         guard let base = isNotchRestState(state) ? notchRestRect() : notchShownRect() else { return }
-        slideNotch(to: base)
+        if notchSlideTimer != nil {
+            slideNotch(to: base)
+        } else {
+            let target = notchFrame(for: base)
+            if globalBounds != target {
+                setGlobalBounds(target)
+            }
+        }
     }
 
     public var isBubbleVisible: Bool { contentView.isBubbleVisible }
