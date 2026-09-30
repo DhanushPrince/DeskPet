@@ -252,4 +252,55 @@ struct DisplayGeometryTests {
         )
         #expect(clamped == bounds, "default placement should already be on screen")
     }
+
+    // MARK: Notch-hang bounds
+
+    @Test("notch-hang bounds centre the pet horizontally on the notch rect and hang from its bottom edge")
+    func notchHangBoundsCentersAndHangs() {
+        let notchRect = GlobalRect(x: 600, y: 0, width: 180, height: 32)
+        let bounds = DisplayGeometry.notchHangBounds(petSize: Self.petSize, notchRect: notchRect)
+
+        // Centred: notch centre x = 600 + 90 = 690; pet centre should match.
+        #expect(bounds.x + Self.petSize.width / 2 == 690)
+        // Hangs from the notch's bottom edge (global y increases downward):
+        // the pet's top edge sits at the notch's bottom edge and the pet's
+        // body extends further down the screen from there.
+        #expect(bounds.y == notchRect.maxY)
+        #expect(bounds.width == Double(Self.petSize.width))
+        #expect(bounds.height == Double(Self.petSize.height))
+    }
+
+    @Test("notch-hang bounds stay centred even when the pet is wider than the notch")
+    func notchHangBoundsHandlesOversizedPet() {
+        let narrowNotch = GlobalRect(x: 700, y: 0, width: 40, height: 32)
+        let bounds = DisplayGeometry.notchHangBounds(petSize: Self.petSize, notchRect: narrowNotch)
+
+        // Still centred on the (narrow) notch, even though the pet now extends
+        // past both of its edges — Notch Mode has one valid position, not a
+        // clamp range.
+        #expect(bounds.x + Self.petSize.width / 2 == 720)
+        #expect(bounds.y == narrowNotch.maxY)
+    }
+
+    @Test("notch-hang bounds follow a moved notch rect")
+    func notchHangBoundsFollowsNotchRect() {
+        let leftNotch = GlobalRect(x: -200, y: 10, width: 180, height: 32)
+        let bounds = DisplayGeometry.notchHangBounds(petSize: Self.petSize, notchRect: leftNotch)
+
+        #expect(bounds.x + Self.petSize.width / 2 == -110)
+        #expect(bounds.y == 42)
+    }
+
+    @Test("notch-hang bounds lift the window so the sprite, not the bubble band, meets the notch")
+    func notchHangBoundsUsesSpriteInset() {
+        let notchRect = GlobalRect(x: 600, y: 0, width: 180, height: 32)
+        let inset = Double(Constants.notchSpriteTopInset)
+        let bounds = DisplayGeometry.notchHangBounds(
+            petSize: Self.petSize,
+            notchRect: notchRect,
+            spriteTopInset: inset
+        )
+        #expect(bounds.y == notchRect.maxY - inset)
+        #expect(bounds.y + inset == notchRect.maxY)
+    }
 }

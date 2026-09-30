@@ -28,6 +28,14 @@ public enum Constants {
     /// `img` in the Electron CSS (184×184, bottom-centred). Leaving the upper
     /// band empty is what keeps speech bubbles from covering the pet.
     public static let petSpriteSize = CGSize(width: 184, height: 184)
+    /// Empty band above the sprite, reserved for speech bubbles. Notch Mode
+    /// shifts the window up by this amount so the drawn pet, not this empty
+    /// band, sits against the bottom of the camera notch.
+    public static var notchSpriteTopInset: CGFloat {
+        petWindowSize.height - petSpriteSize.height
+    }
+    /// Duration of the slide out of, and back into, the notch.
+    public static let notchSlideDuration: TimeInterval = 0.55
     public static let settingsWindowSize = CGSize(width: 760, height: 680)
     public static let settingsWindowMinHeight: CGFloat = 400
 

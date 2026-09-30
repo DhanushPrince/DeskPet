@@ -210,4 +210,39 @@ struct CustomAssetWiringTests {
         #expect(state.settings.petAppearanceID != .custom)
         #expect(state.settings.customPetAppearance == nil)
     }
+
+    @Test("a custom idle asset (e.g. a hanging-pose placeholder) renders correctly while pinned under the notch")
+    func customIdleAssetRendersInNotchMode() throws {
+        try #require(!NSScreen.screens.isEmpty, "no displays attached")
+        guard ScreenBridge.notchHangRect(size: Constants.petWindowSize) != nil else {
+            return // No notch on this machine; nothing to verify here.
+        }
+        let source = try makeGIF()
+        defer { try? FileManager.default.removeItem(at: source) }
+        let (state, cleanup) = makeState()
+        defer { cleanup() }
+
+        // Import a stand-in for the eventual hanging-pose art: only `.idle` is
+        // required, matching how Notch Mode positioning is idle-only too.
+        _ = try #require(state.importCustomAsset(from: source, for: .idle))
+        #expect(state.petWindow.appearance == .custom)
+
+        state.updateSettings { $0.notchModeEnabled = true }
+        state.petWindow.show()
+        state.petWindow.setState(.idle)
+        let deadline = Date().addingTimeInterval(Constants.notchSlideDuration + 0.08)
+        while Date() < deadline {
+            RunLoop.main.run(
+                mode: PetWindowController.notchSlideRunLoopMode,
+                before: Date().addingTimeInterval(0.02)
+            )
+        }
+
+        // The custom asset still renders (no fallback/empty layer)...
+        #expect(state.petWindow.contentView.petLayer.contents != nil)
+        // ...and idle stays tucked in the notch, exactly as it would for any
+        // other appearance.
+        let tucked = try #require(ScreenBridge.notchRestRect(size: Constants.petWindowSize))
+        #expect(state.petWindow.globalBounds == tucked)
+    }
 }

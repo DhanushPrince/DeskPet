@@ -81,4 +81,84 @@ public enum ScreenBridge {
     public static func globalRect(from rect: CGRect) -> GlobalRect {
         CoordinateSpace.globalRect(fromCocoa: rect, primaryFrameHeight: primaryFrameHeight)
     }
+
+    // MARK: - Notch
+
+    /// The built-in display reporting a non-zero top safe-area inset — the
+    /// supported (macOS 12+) way to detect a camera-housing notch. `nil` on
+    /// Macs without one and on external-monitor-only setups.
+    public static var notchScreen: NSScreen? {
+        NSScreen.screens.first { $0.safeAreaInsets.top > 0 }
+    }
+
+    /// Geometry describing the notch on `notchScreen`, in Cocoa (bottom-left)
+    /// coordinates, kept together so callers do not re-derive it piecemeal.
+    struct NotchGeometry {
+        /// Full width of the notch cutout itself (the camera housing), derived
+        /// from the gap between the two auxiliary menu-bar areas.
+        var notchWidth: Double
+        /// Horizontal centre of the notch, in the screen's local Cocoa space.
+        var centerX: Double
+        /// Top edge of the screen, in the screen's local Cocoa space.
+        var screenMaxY: Double
+        /// Height of the safe-area inset — how far the notch extends down from
+        /// the top edge (i.e. the menu-bar band height on a notched Mac).
+        var insetTop: Double
+    }
+
+    /// Pulls the geometry AppKit already computes for the notch: the two
+    /// menu-bar areas flanking the camera housing bound the notch itself, and
+    /// `safeAreaInsets.top` gives its height.
+    static func notchGeometry(for screen: NSScreen) -> NotchGeometry? {
+        guard screen.safeAreaInsets.top > 0 else { return nil }
+        let frame = screen.frame
+        // With no camera housing these areas are empty rects; on a notched Mac
+        // they span from the screen's side edges to the notch's left/right edge.
+        let left = screen.auxiliaryTopLeftArea
+        let right = screen.auxiliaryTopRightArea
+        let notchMinX = left?.maxX ?? frame.midX
+        let notchMaxX = right?.minX ?? frame.midX
+        let width = max(0, notchMaxX - notchMinX)
+        return NotchGeometry(
+            notchWidth: width,
+            centerX: (notchMinX + notchMaxX) / 2,
+            screenMaxY: frame.maxY,
+            insetTop: Double(screen.safeAreaInsets.top)
+        )
+    }
+
+    /// Where the pet should hang in Notch Mode: centred under the notch,
+    /// gripping its bottom edge, in DeskPet's global (top-left) coordinate
+    /// space. `nil` when there is no notch to hang from.
+    public static func notchHangRect(size: CGSize) -> GlobalRect? {
+        guard let screen = notchScreen, let geometry = notchGeometry(for: screen) else {
+            return nil
+        }
+        // The notch's own rect in Cocoa space: full inset height, centred
+        // horizontally, spanning its own width — DisplayGeometry.notchHangBounds
+        // does the actual centring/rounding so there is exactly one
+        // implementation of that math (shared with the drag/clamp call sites).
+        let notchCocoaRect = CGRect(
+            x: geometry.centerX - geometry.notchWidth / 2,
+            y: geometry.screenMaxY - geometry.insetTop,
+            width: geometry.notchWidth,
+            height: geometry.insetTop
+        )
+        let notchGlobalRect = globalRect(from: notchCocoaRect)
+        return DisplayGeometry.notchHangBounds(
+            petSize: size,
+            notchRect: notchGlobalRect,
+            spriteTopInset: Double(Constants.notchSpriteTopInset)
+        )
+    }
+
+    /// Parked above the screen, so the pet is fully hidden until a reminder
+    /// slides it down to `notchHangRect`.
+    public static func notchRestRect(size: CGSize) -> GlobalRect? {
+        guard var shown = notchHangRect(size: size) else { return nil }
+        let spriteTop = shown.y + Double(Constants.notchSpriteTopInset)
+        // Extra points keep the outline from sitting on the top edge of the screen.
+        shown.y -= spriteTop + Double(Constants.petSpriteSize.height) + 4
+        return shown
+    }
 }

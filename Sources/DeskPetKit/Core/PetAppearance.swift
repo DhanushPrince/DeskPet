@@ -89,10 +89,13 @@ public enum PetAppearances {
     public static let all: [BuiltInPetAppearanceID: PetAppearanceManifest] = [
         .lovartPuppy: goldenPuppy,
         .lineDog: lineDog,
-        .xiaoJiMao: xiaoJiMao
+        .xiaoJiMao: xiaoJiMao,
+        .toffee: toffee
     ]
 
-    public static let displayOrder: [BuiltInPetAppearanceID] = [.lovartPuppy, .lineDog, .xiaoJiMao]
+    public static let displayOrder: [BuiltInPetAppearanceID] = [
+        .lovartPuppy, .lineDog, .xiaoJiMao, .toffee
+    ]
 
     public static func manifest(_ id: BuiltInPetAppearanceID) -> PetAppearanceManifest {
         // Force-unwrap is safe: `all` is a compile-time-complete map over the
@@ -352,6 +355,23 @@ private extension PetAppearances {
                 ]),
                 .sleeping: bundled(f, .sleeping, ["线条小狗第14弹_难受.gif"])
             ]
+        )
+    }
+
+    // MARK: Toffee
+
+    static var toffee: PetAppearanceManifest {
+        let f = "Dog"
+        var states: [PetState: PetAssetDefinition] = [:]
+        for state in PetState.allCases {
+            states[state] = bundled(f, state, ["\(state.rawValue).gif"])
+        }
+        return PetAppearanceManifest(
+            id: .toffee,
+            label: "Toffee",
+            folder: f,
+            fallback: bundled(f, .idle, ["idle.gif"], placeholder: true),
+            states: states
         )
     }
 }

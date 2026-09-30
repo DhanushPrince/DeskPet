@@ -105,6 +105,12 @@ public enum Strings {
         public static let launchAtLoginHelp =
             "Packaged macOS and Windows builds will start after login. "
             + "Development builds only save the preference."
+        public static let notchMode = "Notch Mode"
+        public static let notchModeHelp =
+            "The pet stays hidden in the camera notch. A reminder slides it "
+            + "down into view, and answering hides it again."
+        public static let notchModeUnavailable =
+            "Not available — this Mac (or the connected display) has no camera notch."
         public static let updates = "Updates"
         public static let checkForUpdates = "Check for Updates"
         public static let updateNow = "Update now"

@@ -83,31 +83,47 @@ public final class PetContentView: NSView {
         return super.hitTest(point)
     }
 
+    /// How far the sprite is lifted so a notch reminder bubble can sit under it.
+    private var petLift: CGFloat = 0
+    /// Height of the bubble currently placed under the pet. Zero otherwise.
+    public private(set) var bubbleDrop: CGFloat = 0
+
     /// Cocoa frame of the drawn pet, matching Electron's 184×184 bottom slot.
     public var petSpriteFrame: CGRect {
-        Constants.petSpriteFrame(inWindowSize: bounds.size)
+        Constants.petSpriteFrame(inWindowSize: bounds.size).offsetBy(dx: 0, dy: petLift)
     }
 
     // MARK: - Speech bubble
 
     /// Shows a bubble above the pet, sized to its content.
-    public func presentBubble(_ bubble: SpeechBubble) {
+    ///
+    /// `belowPet` places it under the sprite instead, and lifts the sprite by
+    /// the same amount. The window controller shifts the window down to match,
+    /// so the dog stays put and the bubble hangs below the image.
+    public func presentBubble(_ bubble: SpeechBubble, belowPet: Bool = false) {
         bubbleView.present(bubble)
         let panelHeight = SpeechBubbleView.height(for: bubble)
-        // The view's bounds include the tail, which hangs below the panel.
+        // The view's bounds include the tail, which points at the pet.
         let totalHeight = panelHeight + BubbleStyle.tailHeight
-        // Cap so a tall prompt stays inside the window; bottomInset pins the
-        // panel just above the sprite (Electron `bottom: 154px`).
-        let minY = min(
-            BubbleStyle.bottomInset - BubbleStyle.tailHeight,
-            max(0, bounds.height - totalHeight)
-        )
-        bubbleView.frame = CGRect(
-            x: ((bounds.width - BubbleStyle.width) / 2).rounded(),
-            y: minY,
-            width: BubbleStyle.width,
-            height: totalHeight
-        )
+        let x = ((bounds.width - BubbleStyle.width) / 2).rounded()
+        if belowPet {
+            bubbleView.tailPointsUp = true
+            petLift = totalHeight
+            bubbleDrop = totalHeight
+            bubbleView.frame = CGRect(x: x, y: 0, width: BubbleStyle.width, height: totalHeight)
+        } else {
+            bubbleView.tailPointsUp = false
+            petLift = 0
+            bubbleDrop = 0
+            // Cap so a tall prompt stays inside the window; bottomInset pins the
+            // panel just above the sprite (Electron `bottom: 154px`).
+            let minY = min(
+                BubbleStyle.bottomInset - BubbleStyle.tailHeight,
+                max(0, bounds.height - totalHeight)
+            )
+            bubbleView.frame = CGRect(x: x, y: minY, width: BubbleStyle.width, height: totalHeight)
+        }
+        layoutPetLayer()
         bubbleView.isHidden = false
         bubbleView.needsLayout = true
         bubbleView.needsDisplay = true
@@ -115,6 +131,10 @@ public final class PetContentView: NSView {
 
     public func dismissBubble() {
         bubbleView.isHidden = true
+        bubbleView.tailPointsUp = false
+        petLift = 0
+        bubbleDrop = 0
+        layoutPetLayer()
     }
 
     public var isBubbleVisible: Bool { !bubbleView.isHidden }

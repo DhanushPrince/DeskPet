@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import DeskPetKit
 
-/// Ported from `tests/petAppearances.test.ts`, extended to cover all three
+/// Ported from `tests/petAppearances.test.ts`, extended to cover all four
 /// appearances rather than only Boba.
 @Suite("Pet appearances")
 struct PetAppearanceTests {
@@ -14,9 +14,23 @@ struct PetAppearanceTests {
         #expect(PetAppearances.options().contains { $0.value == .xiaoJiMao })
     }
 
-    @Test("persisted appearance id round-trips xiaoJiMao")
-    func resolveAppearanceID() {
+    @Test("options() includes Toffee and every state has its own GIF")
+    func optionsIncludeToffee() {
+        #expect(PetAppearances.options().contains {
+            $0.value == .toffee && $0.label == "Toffee"
+        })
+
+        for state in PetState.allCases {
+            let def = PetAppearances.assetDefinition(appearance: .toffee, state: state)
+            #expect(def.paths == ["Dog/\(state.rawValue)/\(state.rawValue).gif"], "\(state)")
+            #expect(!def.isPlaceholder, "\(state)")
+        }
+    }
+
+    @Test("persisted built-in appearance ids round-trip")
+    func resolveAppearanceIDs() {
         #expect(PetAppearanceID(persisted: "xiaoJiMao") == .xiaoJiMao)
+        #expect(PetAppearanceID(persisted: "toffee") == .toffee)
     }
 
     @Test("unknown or missing appearance ids collapse to lineDog")

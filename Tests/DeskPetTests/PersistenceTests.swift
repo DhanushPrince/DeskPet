@@ -38,6 +38,7 @@ struct SettingsNormalizationTests {
         #expect(!defaults.launchAtLoginEnabled)
         #expect(!defaults.checkUpdatesOnLaunchEnabled)
         #expect(!defaults.onboardingDismissed)
+        #expect(!defaults.notchModeEnabled)
         #expect(defaults.distractionBlockedApps == ["Steam", "Discord", "Telegram"])
         #expect(defaults.distractionBlockedKeywords == [
             "youtube", "youtu.be", "twitter", "x.com", "instagram",
@@ -50,6 +51,22 @@ struct SettingsNormalizationTests {
         let json = #"{"petAppearanceId":"cat"}"#
         let decoded = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
         #expect(decoded.petAppearanceID == Settings.defaults.petAppearanceID)
+    }
+
+    @Test("an older payload without the notch mode key defaults to disabled")
+    func missingNotchModeKeyDefaults() throws {
+        let json = #"{"petAppearanceId":"lineDog"}"#
+        let decoded = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
+        #expect(!decoded.notchModeEnabled)
+    }
+
+    @Test("a stored notch mode preference round-trips through encode/decode")
+    func notchModeEnabledRoundTrips() throws {
+        var settings = Settings.defaults
+        settings.notchModeEnabled = true
+        let data = try JSONEncoder().encode(settings)
+        let decoded = try JSONDecoder().decode(Settings.self, from: data)
+        #expect(decoded.notchModeEnabled)
     }
 
     @Test("older payloads without hydration volume/pacing keys use defaults")

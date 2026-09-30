@@ -45,6 +45,7 @@ public enum BuiltInPetAppearanceID: String, CaseIterable, Codable, Sendable {
     case lovartPuppy
     case lineDog
     case xiaoJiMao
+    case toffee
 }
 
 /// A selected appearance: one of the built-ins, or the user's custom pet.
@@ -52,6 +53,7 @@ public enum PetAppearanceID: String, CaseIterable, Codable, Sendable {
     case lovartPuppy
     case lineDog
     case xiaoJiMao
+    case toffee
     case custom
 
     /// Mirrors `resolvePetAppearanceId`: unknown values collapse to `lineDog`.

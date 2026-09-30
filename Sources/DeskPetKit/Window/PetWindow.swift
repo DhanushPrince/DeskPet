@@ -37,6 +37,13 @@ public final class PetWindow: NSWindow {
     public override var canBecomeKey: Bool { false }
     public override var canBecomeMain: Bool { false }
 
+    /// Notch Mode sits the pet at/under the menu bar, so it needs to render
+    /// above the menu bar rather than merely above normal windows. Free
+    /// roaming keeps the original `.floating` level.
+    public func setNotchModeActive(_ active: Bool) {
+        level = active ? .statusBar : .floating
+    }
+
     /// Borderless windows have no close box, so AppKit's `performClose:` is a
     /// no-op. `NSApp.terminate` then aborts because this window is still open.
     public override func performClose(_ sender: Any?) {

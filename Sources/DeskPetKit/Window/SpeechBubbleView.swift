@@ -59,6 +59,8 @@ public final class SpeechBubbleView: NSView {
     private var actionsByTag: [Int: String] = [:]
 
     public private(set) var bubble: SpeechBubble?
+    /// Notch reminders sit under the pet, so the tail points up at the dog.
+    public var tailPointsUp = false
 
     public override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -199,8 +201,9 @@ public final class SpeechBubbleView: NSView {
 
         let contentWidth = bounds.width - BubbleStyle.padding * 2
         let rows = Self.buttonRows(for: bubble.actions)
-        // The panel sits above the tail, so all content is offset upward by it.
-        let contentBottom = BubbleStyle.tailHeight + BubbleStyle.padding
+        // The tail is the strip outside the panel: below it normally, above it
+        // when the bubble hangs under the pet.
+        let contentBottom = (tailPointsUp ? 0 : BubbleStyle.tailHeight) + BubbleStyle.padding
         let rowStride = BubbleStyle.buttonHeight + BubbleStyle.actionSpacing
 
         // Rows are indexed from the top, but Cocoa's y grows upward, so row 0
@@ -231,7 +234,7 @@ public final class SpeechBubbleView: NSView {
                 + CGFloat(max(0, rows.count - 1)) * BubbleStyle.actionSpacing
             messageBottom += actionsHeight + BubbleStyle.actionsTopMargin
         }
-        let messageTop = bounds.height - BubbleStyle.padding
+        let messageTop = bounds.height - BubbleStyle.padding - (tailPointsUp ? BubbleStyle.tailHeight : 0)
         messageLabel.frame = CGRect(
             x: BubbleStyle.padding,
             y: messageBottom,
@@ -243,10 +246,10 @@ public final class SpeechBubbleView: NSView {
     // MARK: Drawing
 
     public override func draw(_ dirtyRect: NSRect) {
-        // The tail occupies the bottom strip of the view's bounds.
+        // The tail occupies a strip outside the panel, pointing at the pet.
         let panel = CGRect(
             x: 0,
-            y: BubbleStyle.tailHeight,
+            y: tailPointsUp ? 0 : BubbleStyle.tailHeight,
             width: bounds.width,
             height: bounds.height - BubbleStyle.tailHeight
         )
@@ -254,12 +257,17 @@ public final class SpeechBubbleView: NSView {
         let path = NSBezierPath(roundedRect: panel, xRadius: BubbleStyle.cornerRadius,
                                yRadius: BubbleStyle.cornerRadius)
 
-        // Downward tail, centred.
         let tail = NSBezierPath()
         let midX = bounds.midX
-        tail.move(to: CGPoint(x: midX - BubbleStyle.tailHalfWidth, y: panel.minY + 1))
-        tail.line(to: CGPoint(x: midX + BubbleStyle.tailHalfWidth, y: panel.minY + 1))
-        tail.line(to: CGPoint(x: midX, y: 0))
+        if tailPointsUp {
+            tail.move(to: CGPoint(x: midX - BubbleStyle.tailHalfWidth, y: panel.maxY - 1))
+            tail.line(to: CGPoint(x: midX + BubbleStyle.tailHalfWidth, y: panel.maxY - 1))
+            tail.line(to: CGPoint(x: midX, y: bounds.maxY))
+        } else {
+            tail.move(to: CGPoint(x: midX - BubbleStyle.tailHalfWidth, y: panel.minY + 1))
+            tail.line(to: CGPoint(x: midX + BubbleStyle.tailHalfWidth, y: panel.minY + 1))
+            tail.line(to: CGPoint(x: midX, y: 0))
+        }
         tail.close()
 
         BubbleStyle.background.setFill()

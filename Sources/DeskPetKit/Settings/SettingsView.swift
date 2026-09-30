@@ -434,6 +434,17 @@ public struct SettingsView: View {
 
             Divider()
 
+            Toggle(Strings.SettingsLabels.notchMode, isOn: boolBinding(
+                get: { $0.notchModeEnabled },
+                set: { $0.notchModeEnabled = $1 }
+            ))
+            .disabled(!hasNotch)
+            Text(hasNotch ? Strings.SettingsLabels.notchModeHelp : Strings.SettingsLabels.notchModeUnavailable)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Divider()
+
             Toggle(Strings.SettingsLabels.updateCheckOnLaunch, isOn: boolBinding(
                 get: { $0.checkUpdatesOnLaunchEnabled },
                 set: { $0.checkUpdatesOnLaunchEnabled = $1 }
@@ -691,6 +702,10 @@ public struct SettingsView: View {
     }
 
     // MARK: About
+
+    /// Whether the built-in display currently reports a camera notch — gates
+    /// the Notch Mode toggle.
+    private var hasNotch: Bool { ScreenBridge.notchScreen != nil }
 
     private var aboutSection: some View {
         SettingsCard(title: Strings.SettingsLabels.about) {

@@ -237,6 +237,9 @@ struct SettingsEditingTests {
 
         state.updateSettings { $0.hidePetDuringMeetings = false }
         #expect(!state.persistence.settings.hidePetDuringMeetings)
+
+        state.updateSettings { $0.notchModeEnabled = true }
+        #expect(state.persistence.settings.notchModeEnabled)
     }
 
     @Test("an out-of-range value written directly is corrected on load")

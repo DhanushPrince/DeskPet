@@ -144,7 +144,7 @@ struct GIFDecoderTests {
             totalFrames += metadata.frameCount
         }
 
-        #expect(probed == 84, "expected 84 bundled GIFs, probed \(probed)")
+        #expect(probed == 98, "expected 98 bundled GIFs, probed \(probed)")
         print("probed \(probed) bundled GIFs, \(totalFrames) frames total")
     }
 

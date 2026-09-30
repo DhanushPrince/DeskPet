@@ -329,7 +329,16 @@ public final class AppState {
     /// Now also logs the configured serving volume and, when a daily target is
     /// set, acknowledges milestones and celebrates the goal (option c: the pet's
     /// happy animation + a calm bubble + silence for the rest of the day).
+    /// Notch Mode skips the on-screen drink and hides the pet again.
     private func completeHydrationPrompt() {
+        if petWindow.notchModeEnabled {
+            _ = recordServing()
+            hideBubble()
+            scheduler.scheduleHydration()
+            stateMachine.resumeLongTermState()
+            syncDerivedState()
+            return
+        }
         let crossing = recordServing()
 
         stateMachine.beginDrinking()
@@ -554,8 +563,16 @@ public final class AppState {
     }
 
     /// Ported from the `break:mute` action: the pet sulks, then settles, and
-    /// break reminders stop until midnight.
+    /// break reminders stop until midnight. Notch Mode hides straight away.
     private func muteBreaksForToday() {
+        if petWindow.notchModeEnabled {
+            stateMachine.muteBreaksForToday()
+            scheduler.setBreakMuted(true)
+            hideBubble()
+            stateMachine.resumeLongTermState()
+            syncDerivedState()
+            return
+        }
         stateMachine.muteBreaksForToday()
         scheduler.setBreakMuted(true)
         showBubble(SpeechBubble(
@@ -573,10 +590,18 @@ public final class AppState {
         }
     }
 
-    /// Ported from the `break:done` action.
+    /// Ported from the `break:done` action. Notch Mode counts the break and
+    /// hides the pet instead of sending it running across the desktop.
     private func completeBreakPrompt() {
         statsStore.update { $0.breaksTaken += 1 }
         stats = statsStore.current()
+        if petWindow.notchModeEnabled {
+            hideBubble()
+            scheduler.scheduleBreak()
+            stateMachine.resumeLongTermState()
+            syncDerivedState()
+            return
+        }
         startBreakRun()
     }
 
@@ -614,6 +639,7 @@ public final class AppState {
     private func applySettings() {
         petWindow.appearance = settings.petAppearanceID
         petWindow.customAppearance = settings.customPetAppearance
+        petWindow.notchModeEnabled = settings.notchModeEnabled
         // Interval or enablement changes take effect without a restart.
         scheduler.update(settings: settings)
         distractionDetector.update(settings: settings)
@@ -1004,9 +1030,14 @@ public final class AppState {
         }
     }
 
-    /// Ported from the `focus:back` action.
+    /// Ported from the `focus:back` action. Notch Mode hides the pet again.
     private func returnToFocus() {
         stateMachine.returnToFocus()
+        if petWindow.notchModeEnabled {
+            hideBubble()
+            syncDerivedState()
+            return
+        }
         showBubble(SpeechBubble(
             id: BubbleID.focusBack,
             message: Strings.pick(Strings.Bubble.focusBack),

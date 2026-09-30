@@ -18,8 +18,28 @@ public final class PetWindowController {
     private var variant = 0
     /// Rotates variants for long-lived states such as idle.
     private var rotationTimer: Timer?
+    /// Slides the pet out of the notch, or back into it.
+    private var notchSlideTimer: Timer?
+    /// Extra window drop that keeps the dog still while a bubble sits under it.
+    private var notchBubbleDrop: CGFloat = 0
+    /// Notch slides run here as well as in the common modes, so tests can
+    /// advance them without firing unrelated timers.
+    static let notchSlideRunLoopMode = RunLoop.Mode("com.dhanushprince.deskpet.notch-slide")
     /// Decides when the pet is clickable versus click-through.
     public let mouseTracker: PetMouseTracker
+
+    /// Mirrors `Settings.notchModeEnabled`. Raises the window above the menu
+    /// bar and, while idle, pins the pet under the notch instead of wherever
+    /// free-roaming last left it. Toggling this while another state (a break
+    /// prompt, drag, etc.) is showing takes effect the next time the pet
+    /// settles back to `.idle`.
+    public var notchModeEnabled: Bool = false {
+        didSet {
+            guard notchModeEnabled != oldValue else { return }
+            window.setNotchModeActive(notchModeEnabled)
+            applyNotchPositionIfIdle()
+        }
+    }
 
     // MARK: Interaction hooks
 
@@ -98,6 +118,7 @@ public final class PetWindowController {
         mouseTracker.stop()
         rotationTimer?.invalidate()
         rotationTimer = nil
+        stopNotchSlide()
     }
 
     public var isVisible: Bool { window.isVisible }
@@ -130,6 +151,9 @@ public final class PetWindowController {
         // renderer's `stateSignal` effect.
         state = next
         renderCurrentState(forceVariant: true)
+        // Notch Mode: resting states tuck into the camera; reminders slide
+        // the pet down out of the notch. The break run owns its own motion.
+        applyNotchMotion(for: next)
     }
 
     private func renderCurrentState(forceVariant: Bool) {
@@ -178,6 +202,7 @@ public final class PetWindowController {
         guard !isDragBlocked() else { return }
 
         dragOffset = PetDragMath.clampOffset(offset, in: Constants.petWindowSize)
+        stopNotchSlide()
         stopDragTimers()
         // Keep the window interactive for the whole drag, even when the cursor
         // runs outside the pet's hitbox.
@@ -211,6 +236,15 @@ public final class PetWindowController {
         guard wasDragging else { return }
 
         contentView.cancelDrag()
+        // Notch Mode has exactly one valid resting position while idle: drop
+        // the pet back under the notch instead of persisting wherever the
+        // drag left it. `notchHangTarget()` already restricts this to the
+        // idle state, so a drag started from some other state (unusual, but
+        // dragging is only blocked during the break run) still persists the
+        // free position it was dropped at.
+        if let notchTarget = notchHangTarget() {
+            setGlobalBounds(notchTarget)
+        }
         persistPosition()
     }
 
@@ -240,7 +274,19 @@ public final class PetWindowController {
     }
 
     /// Pulls the pet back into a visible work area, for display changes.
+    ///
+    /// In Notch Mode while idle, "visible" means back under the notch rather
+    /// than merely on some display's work area — the notch rect itself may
+    /// have moved (a display was connected/disconnected).
     public func clampIntoVisibleArea() {
+        if let notchTarget = notchHangTarget() {
+            if globalBounds != notchTarget {
+                setGlobalBounds(notchTarget)
+            }
+            persistPosition()
+            return
+        }
+
         let current = globalBounds
         let clamped = DisplayGeometry.visibleBounds(
             displays: ScreenBridge.displays,
@@ -262,6 +308,98 @@ public final class PetWindowController {
         onPositionChanged?(saved)
     }
 
+    // MARK: - Notch Mode positioning
+
+    /// Resting states stay tucked in the camera. Reminders and reactions
+    /// slide down so the whole pet is visible below the notch. The break run
+    /// moves on its own and is left alone.
+    private func isNotchRestState(_ state: PetState) -> Bool {
+        switch state {
+        case .idle, .sitting, .sleeping, .focusGuard:
+            return true
+        case .breakRunning:
+            return false
+        default:
+            return false
+        }
+    }
+
+    /// Fully shown under the notch: the sprite's top edge meets the camera.
+    private func notchShownRect() -> GlobalRect? {
+        ScreenBridge.notchHangRect(size: Constants.petWindowSize)
+    }
+
+    /// Fully above the screen, hidden inside the camera notch.
+    private func notchRestRect() -> GlobalRect? {
+        ScreenBridge.notchRestRect(size: Constants.petWindowSize)
+    }
+
+    /// Where a drag release or a display change should leave a resting pet.
+    /// `nil` while a reminder is showing, during a break run, or with Notch
+    /// Mode off.
+    private func notchHangTarget() -> GlobalRect? {
+        guard notchModeEnabled, isNotchRestState(state) else { return nil }
+        return notchRestRect()
+    }
+
+    /// Snaps a resting pet back into the notch. Used when Notch Mode is
+    /// toggled and when the state changes; drag release and display changes
+    /// snap without the slide.
+    private func applyNotchPositionIfIdle() {
+        applyNotchMotion(for: state, animated: true)
+    }
+
+    private func applyNotchMotion(for state: PetState, animated: Bool = true) {
+        guard notchModeEnabled, state != .breakRunning else {
+            if state == .breakRunning { stopNotchSlide() }
+            return
+        }
+        guard let target = isNotchRestState(state) ? notchRestRect() : notchShownRect() else { return }
+        if animated {
+            slideNotch(to: target)
+        } else if globalBounds != target {
+            stopNotchSlide()
+            setGlobalBounds(target)
+        }
+    }
+
+    private func slideNotch(to base: GlobalRect) {
+        stopNotchSlide()
+        var target = base
+        target.y += Double(notchBubbleDrop)
+        let start = globalBounds
+        guard start != target else { return }
+        let duration = Constants.notchSlideDuration
+        let started = Date()
+        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] timer in
+            guard let self else {
+                timer.invalidate()
+                return
+            }
+            let t = min(1, Date().timeIntervalSince(started) / duration)
+            let eased = 1 - pow(1 - t, 3)
+            self.setGlobalBounds(GlobalRect(
+                x: start.x + (target.x - start.x) * eased,
+                y: start.y + (target.y - start.y) * eased,
+                width: target.width,
+                height: target.height
+            ))
+            if t >= 1 {
+                timer.invalidate()
+                if self.notchSlideTimer === timer { self.notchSlideTimer = nil }
+                self.setGlobalBounds(target)
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        RunLoop.main.add(timer, forMode: Self.notchSlideRunLoopMode)
+        notchSlideTimer = timer
+    }
+
+    private func stopNotchSlide() {
+        notchSlideTimer?.invalidate()
+        notchSlideTimer = nil
+    }
+
     // MARK: - Speech bubble
 
     /// Shows a bubble, replacing any current one and restarting the auto-dismiss
@@ -270,7 +408,8 @@ public final class PetWindowController {
         bubbleTimer?.invalidate()
         bubbleTimer = nil
 
-        contentView.presentBubble(bubble)
+        contentView.presentBubble(bubble, belowPet: notchModeEnabled)
+        syncNotchBubbleDrop()
         // The bubble extends past the pet's hitbox, so re-evaluate immediately
         // rather than waiting for the next mouse move.
         mouseTracker.updateImmediately()
@@ -288,7 +427,24 @@ public final class PetWindowController {
         bubbleTimer?.invalidate()
         bubbleTimer = nil
         contentView.dismissBubble()
+        syncNotchBubbleDrop()
         mouseTracker.updateImmediately()
+    }
+
+    /// Keeps the dog's screen position while the bubble is parked under it.
+    /// The window grows downward by the bubble height, and the sprite is
+    /// lifted inside the window by the same amount.
+    private func syncNotchBubbleDrop() {
+        let drop = notchModeEnabled && contentView.isBubbleVisible ? contentView.bubbleDrop : 0
+        let delta = drop - notchBubbleDrop
+        notchBubbleDrop = drop
+        guard delta != 0 else { return }
+        var bounds = globalBounds
+        bounds.y += Double(delta)
+        setGlobalBounds(bounds)
+        guard notchSlideTimer != nil else { return }
+        guard let base = isNotchRestState(state) ? notchRestRect() : notchShownRect() else { return }
+        slideNotch(to: base)
     }
 
     public var isBubbleVisible: Bool { contentView.isBubbleVisible }

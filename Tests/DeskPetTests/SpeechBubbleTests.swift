@@ -144,6 +144,25 @@ struct SpeechBubblePresentationTests {
         #expect(view.petSpriteFrame.maxY <= Constants.petSpriteSize.height + 0.5)
     }
 
+    @Test("a notch reminder bubble sits under the pet, tail pointing up")
+    func notchBubbleSitsBelowPet() {
+        let view = makeView()
+        view.presentBubble(SpeechBubble(
+            id: "b",
+            message: "Time for water",
+            actions: [
+                BubbleAction(id: "1", label: Strings.Actions.hydrationDone, kind: .primary),
+                BubbleAction(id: "2", label: Strings.Actions.hydrationSnooze)
+            ]
+        ), belowPet: true)
+        view.layoutSubtreeIfNeeded()
+
+        #expect(view.bubbleView.frame.minY == 0)
+        #expect(view.bubbleView.tailPointsUp)
+        #expect(view.petSpriteFrame.minY == view.bubbleView.frame.height)
+        #expect(view.bubbleDrop == view.bubbleView.frame.height)
+    }
+
     @Test("presenting shows the bubble at the ported offset")
     func presentPositionsBubble() {
         let view = makeView()
@@ -396,10 +415,14 @@ struct BubbleLifecycleTests {
 
         controller.showBubble(SpeechBubble(id: "a", message: "First", autoDismissAfter: 0.1))
         try await Task.sleep(for: .milliseconds(60))
-        // Replacing before the first expires must not inherit its deadline.
-        controller.showBubble(SpeechBubble(id: "b", message: "Second", autoDismissAfter: 0.4))
+        // Replacing before the first expires must not inherit its deadline. The
+        // replacement uses a generous deadline so the assertion stays robust even
+        // when a loaded run loop delays timer firing.
+        controller.showBubble(SpeechBubble(id: "b", message: "Second", autoDismissAfter: 1.0))
 
-        try await Task.sleep(for: .milliseconds(120))
+        // Well past the original 0.1s deadline (+ its 60ms head start) but far
+        // short of the replacement's 1.0s deadline.
+        try await Task.sleep(for: .milliseconds(200))
         #expect(controller.isBubbleVisible, "the new bubble's timer should still be running")
         #expect(controller.currentBubble?.id == "b")
     }
@@ -530,7 +553,17 @@ struct HappyFeedbackTests {
         #expect(state.blockingMode == nil, "cycle clears the open prompt")
         #expect(!state.petWindow.isBubbleVisible)
 
-        try await Task.sleep(for: .milliseconds(900))
-        #expect(state.petState == PetState.allCases[1])
+        // The cycle advances on an 0.8s wall-clock timer. Under a loaded parallel
+        // test run the run loop can lag, so poll for the next state rather than
+        // asserting at a single knife-edge instant.
+        var advanced = false
+        for _ in 0..<40 {
+            try await Task.sleep(for: .milliseconds(100))
+            if state.petState == PetState.allCases[1] {
+                advanced = true
+                break
+            }
+        }
+        #expect(advanced, "cycle should advance from allCases[0] to allCases[1]")
     }
 }

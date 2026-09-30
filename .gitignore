@@ -6,3 +6,8 @@
 dist/
 _raw_assets/
 *.log
+
+# Asset-authoring scratch — kept locally for regeneration, never pushed.
+# Anchored to repo root so it does NOT match Sources/.../PetAssets/Dog/.
+/Dog/
+/video/

@@ -205,6 +205,30 @@ public enum DisplayGeometry {
         let target = displayForBounds(displays: displays, bounds: bounds, fallback: primaryDisplay)
         return clampToWorkArea(bounds, target.workArea)
     }
+
+    /// Where the pet sits in Notch Mode: pinned exactly at `notchRect`,
+    /// regardless of where a drag left it. Unlike `visibleBounds`, this does
+    /// not clamp toward the nearest edge — Notch Mode has exactly one valid
+    /// position, so any drag simply snaps back to it on release.
+    ///
+    /// The pet hangs *from* the notch: horizontally centred on it, with the
+    /// drawn sprite's top edge flush against the notch's bottom edge
+    /// (`notchRect.maxY` in DeskPet's top-left-origin global space, where y
+    /// increases downward). `spriteTopInset` is the empty band above the
+    /// sprite inside the window, so the window itself extends up into the
+    /// menu bar and the pet's body comes out just below the camera.
+    public static func notchHangBounds(
+        petSize: CGSize,
+        notchRect: GlobalRect,
+        spriteTopInset: Double = 0
+    ) -> GlobalRect {
+        GlobalRect(
+            x: jsRound(notchRect.x + notchRect.width / 2 - petSize.width / 2),
+            y: notchRect.maxY - spriteTopInset,
+            width: petSize.width,
+            height: petSize.height
+        )
+    }
 }
 
 /// Conversion between DeskPet's top-left global space and Cocoa's bottom-left

@@ -39,6 +39,9 @@ public struct Settings: Equatable, Codable, Sendable {
     public var showWatersStat: Bool
     public var showFocusStat: Bool
     public var showDistractionsStat: Bool
+    /// Opt-in: the pet hangs pinned under the MacBook notch instead of
+    /// free-roaming. Ignored on Macs/displays without a notch.
+    public var notchModeEnabled: Bool
 
     /// `language` is intentionally absent: the Electron build was English-only
     /// by the final commit, and the i18n indirection was dropped in the rewrite.
@@ -70,6 +73,7 @@ public struct Settings: Equatable, Codable, Sendable {
         case showWatersStat
         case showFocusStat
         case showDistractionsStat
+        case notchModeEnabled
     }
 
     /// Ported from `DEFAULT_SETTINGS`.
@@ -102,7 +106,8 @@ public struct Settings: Equatable, Codable, Sendable {
         showBreaksStat: true,
         showWatersStat: true,
         showFocusStat: true,
-        showDistractionsStat: true
+        showDistractionsStat: true,
+        notchModeEnabled: false
     )
 
     /// Missing keys fall back to defaults, so a partial or older payload decodes
@@ -173,6 +178,7 @@ public struct Settings: Equatable, Codable, Sendable {
         showWatersStat = value(.showWatersStat, defaults.showWatersStat)
         showFocusStat = value(.showFocusStat, defaults.showFocusStat)
         showDistractionsStat = value(.showDistractionsStat, defaults.showDistractionsStat)
+        notchModeEnabled = value(.notchModeEnabled, defaults.notchModeEnabled)
     }
 
     public init(
@@ -201,7 +207,8 @@ public struct Settings: Equatable, Codable, Sendable {
         showBreaksStat: Bool = true,
         showWatersStat: Bool = true,
         showFocusStat: Bool = true,
-        showDistractionsStat: Bool = true
+        showDistractionsStat: Bool = true,
+        notchModeEnabled: Bool = false
     ) {
         self.petAppearanceID = petAppearanceID
         self.customPetAppearance = customPetAppearance
@@ -229,6 +236,7 @@ public struct Settings: Equatable, Codable, Sendable {
         self.showWatersStat = showWatersStat
         self.showFocusStat = showFocusStat
         self.showDistractionsStat = showDistractionsStat
+        self.notchModeEnabled = notchModeEnabled
     }
 }
 

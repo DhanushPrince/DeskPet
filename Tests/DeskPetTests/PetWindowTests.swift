@@ -142,6 +142,159 @@ struct PetWindowTests {
         #expect(!window.isVisible)
     }
 
+    @Test("notch mode raises the window above the menu bar; disabling it restores floating")
+    func notchModeWindowLevel() {
+        let window = PetWindow(contentRect: CGRect(x: 0, y: 0, width: 220, height: 340))
+        #expect(window.level == .floating)
+
+        window.setNotchModeActive(true)
+        #expect(window.level == .statusBar)
+
+        window.setNotchModeActive(false)
+        #expect(window.level == .floating)
+    }
+
+    @Test("the controller's notchModeEnabled flag drives the window level")
+    func controllerNotchModeTogglesLevel() {
+        let controller = PetWindowController()
+        #expect(controller.window.level == .floating)
+
+        controller.notchModeEnabled = true
+        #expect(controller.window.level == .statusBar)
+
+        controller.notchModeEnabled = false
+        #expect(controller.window.level == .floating)
+    }
+
+    @Test("notch mode without a physical notch leaves free-roaming positioning untouched")
+    func notchModeWithoutNotchIsANoOp() throws {
+        try #require(!NSScreen.screens.isEmpty, "no displays attached")
+        // No `#require` for the notch check itself: `#require` fails a test on
+        // a false condition, it does not skip it, and whether this machine has
+        // a notch is a hardware fact, not an error. The notch-present path is
+        // covered by the tests below instead.
+        guard ScreenBridge.notchHangRect(size: Constants.petWindowSize) == nil else { return }
+
+        let controller = PetWindowController()
+        controller.show()
+        defer { controller.hide() }
+
+        let before = controller.globalBounds
+        controller.notchModeEnabled = true
+        // No notch to hang from: enabling the setting must not move the pet
+        // or otherwise break free-roaming placement.
+        #expect(controller.globalBounds == before)
+    }
+
+    @Test("notch mode pins the pet under the notch while idle")
+    func notchModePinsPetWhileIdle() throws {
+        try #require(!NSScreen.screens.isEmpty, "no displays attached")
+        guard let target = ScreenBridge.notchHangRect(size: Constants.petWindowSize) else {
+            return // No notch on this machine; nothing to verify here.
+        }
+
+        let controller = PetWindowController()
+        controller.show()
+        defer { controller.hide() }
+
+        controller.notchModeEnabled = true
+        drainNotchSlide()
+        #expect(controller.globalBounds == ScreenBridge.notchRestRect(size: Constants.petWindowSize))
+    }
+
+    @Test("a reminder slides the pet down out of the notch, and idle slides it back")
+    func notchModeSlidesDownForReminders() throws {
+        try #require(!NSScreen.screens.isEmpty, "no displays attached")
+        guard ScreenBridge.notchHangRect(size: Constants.petWindowSize) != nil else {
+            return // No notch on this machine; nothing to verify here.
+        }
+
+        let controller = PetWindowController()
+        controller.show()
+        defer { controller.hide() }
+        controller.notchModeEnabled = true
+        drainNotchSlide()
+
+        guard let shown = ScreenBridge.notchHangRect(size: Constants.petWindowSize) else { return }
+        controller.setState(.breakPrompt)
+        drainNotchSlide()
+        #expect(controller.globalBounds == shown)
+
+        // Once the slide finishes, a manual move is left alone until the
+        // state changes. The break run still owns its own motion.
+        controller.setGlobalBounds(GlobalRect(x: 40, y: 40, width: 220, height: 340))
+        #expect(controller.globalBounds == GlobalRect(x: 40, y: 40, width: 220, height: 340))
+
+        controller.setState(.idle)
+        drainNotchSlide()
+        #expect(controller.globalBounds == ScreenBridge.notchRestRect(size: Constants.petWindowSize))
+    }
+
+    @Test("clamping into the visible area re-pins to the notch in notch mode")
+    func clampIntoVisibleAreaRepinsToNotch() throws {
+        try #require(!NSScreen.screens.isEmpty, "no displays attached")
+        guard let target = ScreenBridge.notchHangRect(size: Constants.petWindowSize) else {
+            return // No notch on this machine; nothing to verify here.
+        }
+
+        let controller = PetWindowController()
+        controller.show()
+        defer { controller.hide() }
+        controller.notchModeEnabled = true
+        drainNotchSlide()
+        #expect(controller.globalBounds == ScreenBridge.notchRestRect(size: Constants.petWindowSize))
+
+        // Simulate a display change knocking the pet elsewhere, then recovering.
+        controller.setGlobalBounds(GlobalRect(x: 9000, y: 9000, width: 220, height: 340))
+        controller.clampIntoVisibleArea()
+        #expect(controller.globalBounds == ScreenBridge.notchRestRect(size: Constants.petWindowSize))
+    }
+
+    @Test("stopping a drag in notch mode snaps the pet back under the notch")
+    func stopDragSnapsBackToNotchWhileIdle() throws {
+        try #require(!NSScreen.screens.isEmpty, "no displays attached")
+        guard let target = ScreenBridge.notchHangRect(size: Constants.petWindowSize) else {
+            return // No notch on this machine; nothing to verify here.
+        }
+
+        let controller = PetWindowController()
+        controller.show()
+        defer { controller.hide() }
+        controller.notchModeEnabled = true
+        drainNotchSlide()
+        #expect(controller.globalBounds == ScreenBridge.notchRestRect(size: Constants.petWindowSize))
+
+        // Dragging moves the window freely mid-drag — simulate that by moving
+        // the window directly, the way `moveWithCursor` would, then release.
+        controller.startDrag(offset: .zero)
+        controller.setGlobalBounds(GlobalRect(x: 50, y: 500, width: 220, height: 340))
+        #expect(controller.globalBounds != ScreenBridge.notchRestRect(size: Constants.petWindowSize))
+
+        controller.stopDrag()
+        #expect(controller.globalBounds == ScreenBridge.notchRestRect(size: Constants.petWindowSize))
+    }
+
+    @Test("stopping a drag outside notch mode persists the free position as before")
+    func stopDragOutsideNotchModePersistsFreePosition() throws {
+        try #require(!NSScreen.screens.isEmpty, "no displays attached")
+
+        let controller = PetWindowController()
+        controller.show()
+        defer { controller.hide() }
+        // notchModeEnabled defaults to false: regression guard that Task 6's
+        // change is additive, not a behaviour change for free-roaming.
+
+        var saved: SavedWindowPosition?
+        controller.onPositionChanged = { saved = $0 }
+
+        controller.startDrag(offset: .zero)
+        controller.setGlobalBounds(GlobalRect(x: 50, y: 500, width: 220, height: 340))
+        controller.stopDrag()
+
+        #expect(controller.globalBounds == GlobalRect(x: 50, y: 500, width: 220, height: 340))
+        #expect(saved != nil)
+    }
+
     @Test("the window opens at the pet size")
     func windowSize() {
         let controller = PetWindowController()
@@ -215,5 +368,15 @@ struct PetWindowTests {
                 )
             }
         }
+    }
+}
+
+private func drainNotchSlide() {
+    let deadline = Date().addingTimeInterval(Constants.notchSlideDuration + 0.08)
+    while Date() < deadline {
+        RunLoop.main.run(
+            mode: PetWindowController.notchSlideRunLoopMode,
+            before: Date().addingTimeInterval(0.02)
+        )
     }
 }
