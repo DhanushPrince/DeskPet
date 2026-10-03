@@ -90,11 +90,12 @@ public enum PetAppearances {
         .lovartPuppy: goldenPuppy,
         .lineDog: lineDog,
         .xiaoJiMao: xiaoJiMao,
-        .toffee: toffee
+        .toffee: toffee,
+        .chittu: chittu
     ]
 
     public static let displayOrder: [BuiltInPetAppearanceID] = [
-        .lovartPuppy, .lineDog, .xiaoJiMao, .toffee
+        .lovartPuppy, .lineDog, .xiaoJiMao, .toffee, .chittu
     ]
 
     public static func manifest(_ id: BuiltInPetAppearanceID) -> PetAppearanceManifest {
@@ -369,6 +370,23 @@ private extension PetAppearances {
         return PetAppearanceManifest(
             id: .toffee,
             label: "Toffee",
+            folder: f,
+            fallback: bundled(f, .idle, ["idle.gif"], placeholder: true),
+            states: states
+        )
+    }
+
+    // MARK: Chittu
+
+    static var chittu: PetAppearanceManifest {
+        let f = "Cat"
+        var states: [PetState: PetAssetDefinition] = [:]
+        for state in PetState.allCases {
+            states[state] = bundled(f, state, ["\(state.rawValue).gif"])
+        }
+        return PetAppearanceManifest(
+            id: .chittu,
+            label: "Chittu",
             folder: f,
             fallback: bundled(f, .idle, ["idle.gif"], placeholder: true),
             states: states

@@ -27,10 +27,24 @@ struct PetAppearanceTests {
         }
     }
 
+    @Test("options() includes Chittu and every state has its own GIF")
+    func optionsIncludeChittu() {
+        #expect(PetAppearances.options().contains {
+            $0.value == .chittu && $0.label == "Chittu"
+        })
+
+        for state in PetState.allCases {
+            let def = PetAppearances.assetDefinition(appearance: .chittu, state: state)
+            #expect(def.paths == ["Cat/\(state.rawValue)/\(state.rawValue).gif"], "\(state)")
+            #expect(!def.isPlaceholder, "\(state)")
+        }
+    }
+
     @Test("persisted built-in appearance ids round-trip")
     func resolveAppearanceIDs() {
         #expect(PetAppearanceID(persisted: "xiaoJiMao") == .xiaoJiMao)
         #expect(PetAppearanceID(persisted: "toffee") == .toffee)
+        #expect(PetAppearanceID(persisted: "chittu") == .chittu)
     }
 
     @Test("unknown or missing appearance ids collapse to lineDog")

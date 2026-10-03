@@ -38,14 +38,15 @@ public enum BlockingMode: String, Codable, Sendable {
     case focusWarning
 }
 
-/// The three bundled appearances. Raw values match the persisted identifiers
-/// used by the Electron build so migrated settings keep working; note that
-/// `lovartPuppy` is Snowy.
+/// Bundled appearances. Raw values for the original three match the persisted
+/// identifiers used by the Electron build so migrated settings keep working;
+/// note that `lovartPuppy` is Snowy.
 public enum BuiltInPetAppearanceID: String, CaseIterable, Codable, Sendable {
     case lovartPuppy
     case lineDog
     case xiaoJiMao
     case toffee
+    case chittu
 }
 
 /// A selected appearance: one of the built-ins, or the user's custom pet.
@@ -54,6 +55,7 @@ public enum PetAppearanceID: String, CaseIterable, Codable, Sendable {
     case lineDog
     case xiaoJiMao
     case toffee
+    case chittu
     case custom
 
     /// Mirrors `resolvePetAppearanceId`: unknown values collapse to `lineDog`.
