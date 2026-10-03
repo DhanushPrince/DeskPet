@@ -37,7 +37,19 @@ public final class PetWindowController {
         didSet {
             guard notchModeEnabled != oldValue else { return }
             window.setNotchModeActive(notchModeEnabled)
-            applyNotchPositionIfIdle()
+            if notchModeEnabled {
+                applyNotchPositionIfIdle()
+            } else {
+                // Turning Notch Mode off must release a pet parked under the
+                // notch back onto the normal work area — otherwise it stays
+                // pinned up there instead of free-roaming. `clampIntoVisibleArea`
+                // takes the free-roam branch now that the mode is off; the
+                // break-run guard keeps the running pet where it is.
+                stopNotchSlide()
+                if state != .breakRunning {
+                    clampIntoVisibleArea()
+                }
+            }
             if notchSlideTimer == nil {
                 syncAnimationSuspension()
             }

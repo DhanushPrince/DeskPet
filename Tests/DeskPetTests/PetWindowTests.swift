@@ -216,7 +216,36 @@ struct PetWindowTests {
         #expect(controller.globalBounds == ScreenBridge.notchRestRect(size: Constants.petWindowSize))
     }
 
-    @Test("a reminder slides the pet down out of the notch, and idle slides it back")
+    @Test("turning notch mode off releases the pet from the notch back to free-roam")
+    func notchModeOffReleasesPet() throws {
+        try #require(!NSScreen.screens.isEmpty, "no displays attached")
+        let restRect = ScreenBridge.notchRestRect(size: Constants.petWindowSize)
+        guard ScreenBridge.notchHangRect(size: Constants.petWindowSize) != nil else {
+            return // No notch on this machine; nothing to verify here.
+        }
+
+        let controller = PetWindowController()
+        controller.show()
+        defer { controller.hide() }
+
+        controller.notchModeEnabled = true
+        drainNotchSlide()
+        #expect(controller.globalBounds == restRect)
+
+        // Turning the mode off must move the pet out of the notch rest rect,
+        // not leave it pinned there. It lands on the visible work area.
+        controller.notchModeEnabled = false
+        drainNotchSlide()
+        #expect(controller.globalBounds != restRect)
+        let onArea = DisplayGeometry.visibleBounds(
+            displays: ScreenBridge.displays,
+            primaryDisplay: ScreenBridge.primaryDisplay,
+            bounds: controller.globalBounds
+        )
+        #expect(controller.globalBounds == onArea)
+    }
+
+
     func notchModeSlidesDownForReminders() throws {
         try #require(!NSScreen.screens.isEmpty, "no displays attached")
         guard ScreenBridge.notchHangRect(size: Constants.petWindowSize) != nil else {
