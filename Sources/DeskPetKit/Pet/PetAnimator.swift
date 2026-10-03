@@ -18,6 +18,7 @@ public final class PetAnimator {
     private let layer: CALayer
     /// Re-triggers the animation for assets that declare `replayIntervalMs`.
     private var replayTimer: Timer?
+    private var replayIntervalMs: Int?
     private var currentURL: URL?
 
     private static let animationKey = "deskpet.frames"
@@ -70,16 +71,39 @@ public final class PetAnimator {
         guard let gif = Self.decoded(url) else { return false }
 
         currentURL = url
+        replayIntervalMs = definition.replayIntervalMs
         apply(gif)
-        scheduleReplay(intervalMs: definition.replayIntervalMs)
+        scheduleReplay(intervalMs: replayIntervalMs)
         return true
     }
 
     public func stop() {
+        pause()
+        currentURL = nil
+        replayIntervalMs = nil
+    }
+
+    /// True while a `CAKeyframeAnimation` is attached to the pet layer.
+    public var isAnimating: Bool {
+        layer.animation(forKey: Self.animationKey) != nil
+    }
+
+    /// Freezes the current frame and drops the looping animation so Window
+    /// Server stops compositing GIF updates. `resume()` restarts it.
+    public func pause() {
         replayTimer?.invalidate()
         replayTimer = nil
+        if let presented = layer.presentation()?.contents {
+            layer.contents = presented
+        }
         layer.removeAnimation(forKey: Self.animationKey)
-        currentURL = nil
+    }
+
+    /// Restarts the last loaded GIF, if any.
+    public func resume() {
+        guard let url = currentURL, let gif = Self.cache[url] else { return }
+        apply(gif)
+        scheduleReplay(intervalMs: replayIntervalMs)
     }
 
     /// Intrinsic pixel size of the animation currently playing.
@@ -104,7 +128,8 @@ public final class PetAnimator {
         animation.keyTimes = Self.keyTimes(durations: gif.frameDurations)
         animation.duration = gif.totalDuration
         animation.calculationMode = .discrete
-        animation.repeatCount = .infinity
+        // Play once when a replay interval will re-trigger; otherwise loop.
+        animation.repeatCount = replayIntervalMs != nil ? 1 : .infinity
         animation.isRemovedOnCompletion = false
         // Frames must appear exactly as authored, with no interpolation or
         // easing between them.

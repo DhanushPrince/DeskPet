@@ -42,6 +42,20 @@ struct PetAnimationTests {
         #expect(PetAnimator.keyTimes(durations: [0, 0]).map(\.doubleValue) == [0, 1])
     }
 
+    @Test("pause drops the looping animation and resume restores it")
+    func pauseAndResume() throws {
+        let layer = CALayer()
+        let animator = PetAnimator(layer: layer)
+        let definition = PetAppearances.assetDefinition(appearance: .lineDog, state: .idle)
+        #expect(animator.play(definition: definition))
+        #expect(animator.isAnimating)
+        animator.pause()
+        #expect(!animator.isAnimating)
+        #expect(layer.contents != nil)
+        animator.resume()
+        #expect(animator.isAnimating)
+    }
+
     @Test("keyTimes derived from a real bundled GIF are well formed")
     func keyTimesFromRealGIF() throws {
         let definition = PetAppearances.assetDefinition(appearance: .lineDog, state: .idle)
@@ -401,6 +415,43 @@ struct PetWindowTests {
 
         controller.facing = .right
         #expect(CATransform3DIsIdentity(controller.contentView.petLayer.transform))
+    }
+
+    @Test("hiding the pet stops the GIF so it is not composited off-screen")
+    func hideStopsAnimation() throws {
+        try #require(!NSScreen.screens.isEmpty, "no displays attached")
+
+        let controller = PetWindowController()
+        controller.show()
+        #expect(controller.contentView.animator.isAnimating)
+        #expect(controller.contentView.petLayer.contents != nil)
+
+        controller.hide()
+        #expect(!controller.contentView.animator.isAnimating)
+
+        controller.show()
+        #expect(controller.contentView.animator.isAnimating)
+    }
+
+    @Test("parking in the notch pauses the GIF; a reminder starts it again")
+    func notchRestPausesAnimation() throws {
+        try #require(!NSScreen.screens.isEmpty, "no displays attached")
+        guard ScreenBridge.notchHangRect(size: Constants.petWindowSize) != nil else {
+            return
+        }
+
+        let controller = PetWindowController()
+        controller.show()
+        defer { controller.hide() }
+        #expect(controller.contentView.animator.isAnimating)
+
+        controller.notchModeEnabled = true
+        drainNotchSlide()
+        #expect(!controller.contentView.animator.isAnimating)
+
+        controller.setState(.breakPrompt)
+        drainNotchSlide()
+        #expect(controller.contentView.animator.isAnimating)
     }
 
     @Test("showing the pet loads a real animation into the layer")

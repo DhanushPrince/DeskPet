@@ -38,6 +38,9 @@ public final class PetWindowController {
             guard notchModeEnabled != oldValue else { return }
             window.setNotchModeActive(notchModeEnabled)
             applyNotchPositionIfIdle()
+            if notchSlideTimer == nil {
+                syncAnimationSuspension()
+            }
         }
     }
 
@@ -61,6 +64,8 @@ public final class PetWindowController {
     private var dragTimer: Timer?
     private var dragSafetyTimer: Timer?
     private var bubbleTimer: Timer?
+    /// Workspace sleep/wake observers. Removed in `deinit`.
+    private var workspaceObservers: [NSObjectProtocol] = []
 
     public init(savedPosition: SavedWindowPosition? = nil) {
         let displays = ScreenBridge.displays
@@ -90,6 +95,7 @@ public final class PetWindowController {
         mouseTracker.additionalInteractiveRects = { [weak self] in
             self?.contentView.additionalInteractiveRects ?? []
         }
+        observePowerState()
     }
 
     deinit {
@@ -97,7 +103,12 @@ public final class PetWindowController {
         dragTimer?.invalidate()
         dragSafetyTimer?.invalidate()
         bubbleTimer?.invalidate()
+        stopNotchSlide()
         mouseTracker.stop()
+        let center = NSWorkspace.shared.notificationCenter
+        for observer in workspaceObservers {
+            center.removeObserver(observer)
+        }
     }
 
     /// Shows the pet without taking focus from the frontmost app — the
@@ -122,9 +133,58 @@ public final class PetWindowController {
         rotationTimer?.invalidate()
         rotationTimer = nil
         stopNotchSlide()
+        contentView.animator.pause()
     }
 
     public var isVisible: Bool { window.isVisible }
+
+    /// Pause the GIF while the window is off-screen, parked in the notch, or
+    /// the display is asleep. Window Server otherwise keeps compositing it.
+    private var shouldSuspendAnimation: Bool {
+        if !window.isVisible { return true }
+        guard notchModeEnabled, isNotchRestState(state), notchSlideTimer == nil else {
+            return false
+        }
+        return ScreenBridge.notchRestRect(size: Constants.petWindowSize) != nil
+    }
+
+    private func syncAnimationSuspension() {
+        if shouldSuspendAnimation {
+            contentView.animator.pause()
+        } else if window.isVisible {
+            contentView.animator.resume()
+        }
+    }
+
+    private func observePowerState() {
+        let center = NSWorkspace.shared.notificationCenter
+        let sleep: [NSNotification.Name] = [
+            NSWorkspace.screensDidSleepNotification,
+            NSWorkspace.willSleepNotification
+        ]
+        for name in sleep {
+            workspaceObservers.append(center.addObserver(
+                forName: name,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.contentView.animator.pause()
+            })
+        }
+        let wake: [NSNotification.Name] = [
+            NSWorkspace.screensDidWakeNotification,
+            NSWorkspace.didWakeNotification
+        ]
+        for name in wake {
+            workspaceObservers.append(center.addObserver(
+                forName: name,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.syncAnimationSuspension()
+            })
+        }
+    }
 
     public var facing: PetFacing {
         get { contentView.facing }
@@ -177,6 +237,9 @@ public final class PetWindowController {
         }
 
         scheduleVariantRotation(variantCount: definition.paths.count)
+        if shouldSuspendAnimation {
+            contentView.animator.pause()
+        }
     }
 
     private func scheduleVariantRotation(variantCount: Int) {
@@ -398,7 +461,13 @@ public final class PetWindowController {
             setGlobalBounds(start)
             start = globalBounds
         }
-        guard start != target else { return }
+        guard start != target else {
+            syncAnimationSuspension()
+            return
+        }
+        if !isNotchRestState(state) {
+            contentView.animator.resume()
+        }
         let duration = Constants.notchSlideDuration
         let started = Date()
         let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] timer in
@@ -418,6 +487,7 @@ public final class PetWindowController {
                 timer.invalidate()
                 if self.notchSlideTimer === timer { self.notchSlideTimer = nil }
                 self.setGlobalBounds(target)
+                self.syncAnimationSuspension()
             }
         }
         RunLoop.main.add(timer, forMode: .common)
